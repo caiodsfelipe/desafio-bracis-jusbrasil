@@ -103,6 +103,7 @@ src/
   prompts/                 prompts versionados, com histórico e notas
 tests/                     suíte de regressão, sem banco e sem modelo
 avaliar.py                 avaliação reprodutível contra o conjunto de referência
+robustez.py                score sob perturbação dos documentos
 ```
 
 ### Prompts versionados
@@ -139,12 +140,25 @@ pip install torch transformers pydantic pandas numpy pytest
 pytest tests/                    # suíte de regressão, roda em milissegundos
 python avaliar.py                # avaliação determinística, sem carregar o modelo
 python avaliar.py --com-modelo   # pipeline completo, requer GPU
+python robustez.py               # score sob perturbação dos documentos
 ```
 
 `avaliar.py` imprime o score por nível, a cobertura da extração e o acerto por
 caminho de resolução, marcando com `*` os caminhos que dependem do modelo.
 `--json relatorio.json` grava o relatório completo com commit e versões de
 prompt.
+
+`robustez.py` reaplica a métrica sobre versões perturbadas dos documentos,
+preservando os spans do gabarito. É a medida que importa para um conjunto de
+avaliação cego, cujo ruído não está no conjunto de referência:
+
+| Perturbação | Score |
+|---|---|
+| nenhuma | 1.0863 |
+| ruído de digitalização em 2% dos algarismos | 1.0657 |
+| ponto de milhar entregue como espaço | 1.0721 |
+| indicador de número com o outro sinal de grau | 1.0863 |
+| travessão no lugar do hífen | 1.0863 |
 
 Requer GPU para o pipeline completo. Em bfloat16 o modelo ocupa cerca de
 16.4 GB; no Kaggle (T4 ×2) é distribuído entre as duas GPUs com
