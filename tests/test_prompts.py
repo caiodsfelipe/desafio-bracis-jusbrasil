@@ -4,9 +4,11 @@ Registro de prompts e leitura da resposta do modelo.
 O contrato que importa é o da fronteira: o pipeline precisa continuar
 determinístico diante de qualquer resposta, inclusive fora do formato.
 """
+import hashlib
+
 import pytest
 
-from prompt_dono import _indice_da_resposta, montar_opcoes
+from prompt_dono import NENHUMA, _indice_da_resposta, montar_opcoes
 from prompts import Prompt, registrar
 from prompts.escolha_de_registro import VIGENTE as ESCOLHA
 from prompts.extracao_em_prosa import VIGENTE as EXTRACAO
@@ -48,3 +50,30 @@ def test_opcoes_sao_numeradas_a_partir_de_um():
     opcoes = montar_opcoes(["AgInt no RECURSO ESPECIAL", "EMBARGOS DE DIVERGÊNCIA"])
     assert opcoes.startswith("1. AgInt")
     assert "\n2. EMBARGOS" in opcoes
+
+
+# Soma de verificação do texto que está em produção desde a submissão que
+# marcou 1.00755 na avaliação oficial. Nenhuma avaliação local exercita o
+# caminho do modelo, de modo que uma reescrita do prompt muda o resultado
+# sem alterar nada que se possa medir aqui. Alterar um destes valores é
+# declarar que a mudança é deliberada e que será medida numa submissão.
+SOMAS_EM_PRODUCAO = {
+    "escolha_de_registro@v2": "e7240aaff50ed877",
+    "extracao_em_prosa@v2": "85613353af97ddec",
+}
+
+
+@pytest.mark.parametrize("prompt", [ESCOLHA, EXTRACAO])
+def test_texto_em_producao_nao_mudou(prompt):
+    soma = hashlib.sha256(prompt.texto.encode()).hexdigest()[:16]
+    assert soma == SOMAS_EM_PRODUCAO[prompt.identificador], (
+        f"o texto de {prompt.identificador} mudou; crie uma versão nova em vez "
+        "de editar a que está em produção"
+    )
+
+
+def test_modelo_pode_recusar_todas_as_opcoes():
+    """O prompt em produção admite zero como resposta, e o pipeline lê essa
+    recusa como citação a processo que não está no acervo."""
+    assert "0" in ESCOLHA.texto
+    assert _indice_da_resposta("0", 2) == NENHUMA

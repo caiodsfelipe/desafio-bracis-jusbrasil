@@ -223,7 +223,7 @@ def resolver_citacoes(
     """
     from indice_normativo import eh_citacao_normativa, resolver_normativo
     from normalizacao import normalizar_identificadores
-    from prompt_dono import escolher_registro_lote
+    from prompt_dono import NENHUMA, escolher_registro_lote
 
     resultados: list[Resolucao | None] = [None] * len(candidatos)
     disputas: list[tuple[str, list[str]]] = []
@@ -297,8 +297,12 @@ def resolver_citacoes(
     escolhas = escolher_registro_lote(qwen, disputas)
 
     for (posicao, em_disputa), escolha in zip(pendentes, escolhas, strict=True):
-        resultados[posicao] = resolvido_por(
-            "desempate", "real", em_disputa[escolha].id_canonico
+        # O modelo recusou todas: o número consta do acervo apenas em
+        # fundamentações, e nenhum processo responde por ele.
+        resultados[posicao] = (
+            resolvido_por("so_mencionado", "inventada")
+            if escolha == NENHUMA
+            else resolvido_por("desempate", "real", em_disputa[escolha].id_canonico)
         )
 
     if any(r is None for r in resultados):

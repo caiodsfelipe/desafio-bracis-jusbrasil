@@ -10,7 +10,6 @@ from dataclasses import dataclass
 
 from regex_extracao import extrair_candidatos as extrair_por_regex
 from regex_prosa import extrair_candidatos as extrair_prosa_por_regex
-from regex_prosa import tem_marca_de_julgado
 from verificacao_substring import localizar_ocorrencias
 
 
@@ -51,13 +50,6 @@ def _candidatos_do_llm(texto: str, citacoes_extraidas: list) -> list[CandidatoCi
     """Resolve o span de cada trecho copiado pelo LLM, localizando-o no
     texto original; trecho que não é encontrado ali é descartado.
 
-    O trecho precisa nomear um tribunal, um relator ou o julgado. Os
-    padrões estruturais já delimitam as formas conhecidas de citação, e um
-    trecho que escapa a todas elas sem trazer nenhuma dessas marcas não
-    identifica julgado nenhum. A exigência importa porque um candidato
-    espúrio custa tanto quanto uma citação perdida: medido sobre o conjunto
-    de referência, um de cada por documento tira 0,096 e 0,085 do score.
-
     Quando o mesmo trecho ocorre mais de uma vez, as ocorrências são
     consumidas em ordem, de modo que duas citações idênticas em pontos
     diferentes do documento se tornem candidatos distintos."""
@@ -65,8 +57,6 @@ def _candidatos_do_llm(texto: str, citacoes_extraidas: list) -> list[CandidatoCi
     candidatos = []
     for citacao in citacoes_extraidas:
         if citacao.e_numero_do_proprio_documento:
-            continue
-        if not tem_marca_de_julgado(citacao.trecho):
             continue
         for inicio, fim in localizar_ocorrencias(texto, citacao.trecho):
             if (inicio, fim) in usados:

@@ -104,6 +104,7 @@ src/
 tests/                     suíte de regressão, sem banco e sem modelo
 avaliar.py                 avaliação reprodutível contra o conjunto de referência
 robustez.py                score sob perturbação dos documentos
+comparar.py                diferença de comportamento contra uma versão anterior
 ```
 
 ### Prompts versionados
@@ -116,7 +117,13 @@ resultado sempre possa ser reproduzido com o prompt exato que o produziu.
 | Família | Vigente | Papel |
 |---|---|---|
 | `escolha_de_registro` | v2 | Escolhe entre registros autuados com o mesmo número |
-| `extracao_em_prosa` | v3 | Extrai citações em prosa fora dos moldes cobertos por padrão |
+| `extracao_em_prosa` | v2 | Extrai as citações em prosa que os padrões não alcançaram |
+
+O texto em produção está protegido por soma de verificação na suíte de
+testes. Nenhuma avaliação local exercita o caminho do modelo, então uma
+reescrita de prompt muda o resultado da submissão sem alterar nada que se
+possa medir aqui: por isso o texto vigente só muda por decisão deliberada,
+criando uma versão nova.
 
 ## Modelo
 
@@ -147,6 +154,17 @@ python robustez.py               # score sob perturbação dos documentos
 caminho de resolução, marcando com `*` os caminhos que dependem do modelo.
 `--json relatorio.json` grava o relatório completo com commit e versões de
 prompt.
+
+`comparar.py <revisão>` mostra a diferença de comportamento contra uma
+versão anterior do próprio repositório, em duas frentes: as predições de
+cada documento e os prompts que seriam enviados ao modelo. Comparar apenas
+as predições esconde uma mudança de prompt, que altera o resultado da
+submissão sem alterar nada localmente. Rode antes de submeter, contra a
+revisão do melhor resultado conhecido:
+
+```bash
+python comparar.py v1.0.0
+```
 
 `robustez.py` reaplica a métrica sobre versões perturbadas dos documentos,
 preservando os spans do gabarito. É a medida que importa para um conjunto de
