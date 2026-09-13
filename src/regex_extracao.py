@@ -38,6 +38,33 @@ _PADRAO_SUMULA = re.compile(
     re.IGNORECASE,
 )
 
+# Citação de dispositivo de lei: "art. 373, I, do CPC", "artigo 7º, XXIX, da
+# Constituição Federal", "art. 1º, I, 'g', da Lei Complementar nº 64/1990".
+# Estrutura: art/artigo + número (com ordinal, ponto de milhar) + eventuais
+# incisos/alíneas/parágrafos + preposição + nome do diploma (sigla em caixa
+# alta, ou nome por extenso iniciado em maiúscula, podendo ter "nº 9.504/1997").
+#
+# Vale um padrão próprio porque o diploma é parte da identidade da citação
+# (art. 290 é real no CPM e inventado na Constituição) e o padrão geral não
+# chega até ele: para no número, deixando o span curto demais para o IoU.
+_INCISOS = r"(?:\s*,\s*(?:[IVXLC]+|[a-z]|§\s*\d+[º°]?(?:-[A-Z])?|'[a-z]'|\"[a-z]\"))*"
+# `\s` (não " ") entre as palavras: o nome do diploma pode ter quebra de
+# linha no meio ("Código\nde Processo Penal"). A primeira palavra tem de ser
+# maiúscula ou sigla — depois dela conectores minúsculos são aceitos, o que
+# cobre "Código de Defesa do Consumidor".
+_PALAVRA_DIPLOMA = r"(?:[A-ZÀ-Ý][a-zà-ÿ]+|d[aeo]s?|e)"
+_DIPLOMA = (
+    r"(?:[A-ZÀ-Ý]{2,}"                                   # sigla: CPC, CLT, CDC
+    rf"|[A-ZÀ-Ý][a-zà-ÿ]+(?:\s+{_PALAVRA_DIPLOMA}){{0,5}}"  # ou nome por extenso
+    r"(?:\s*n[º°.]?\s*[\d./-]+)?)"                       # e eventual "nº 9.504/1997"
+)
+# sem re.IGNORECASE: a distinção de caixa em _DIPLOMA é o que separa o nome
+# do diploma ("Código de Defesa do Consumidor") do texto comum que o segue
+_PADRAO_ARTIGO = re.compile(
+    rf"\b[Aa]rt(?:igo)?\.?\s*\d{{1,3}}(?:\.\d{{3}})*[º°]?{_INCISOS}"
+    rf"\s*,?\s*d[aeo]s?\s+{_DIPLOMA}"
+)
+
 # rejeita match que termina em preposição (de/em) + ano isolado de 4 dígitos
 # — sinal de citação em prosa ("proferido em 2024"), não identificador real
 _PADRAO_PREPOSICAO_ANO = re.compile(r"\b(?:de|em)\s+\d{4}$", re.IGNORECASE)
@@ -48,7 +75,7 @@ def extrair_candidatos(texto: str) -> list[tuple[int, int, str]]:
     encontrada por regex. Não decompõe rótulo/identificador — a normalização
     (normalizacao.py) faz isso depois, a partir do span já delimitado."""
     candidatos = []
-    for padrao in (_PADRAO_CITACAO, _PADRAO_SUMULA):
+    for padrao in (_PADRAO_CITACAO, _PADRAO_SUMULA, _PADRAO_ARTIGO):
         for m in padrao.finditer(texto):
             if _PADRAO_PREPOSICAO_ANO.search(m.group()):
                 continue

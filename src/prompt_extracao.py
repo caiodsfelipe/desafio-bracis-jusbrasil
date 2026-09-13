@@ -32,12 +32,15 @@ antes ("Invoca-se, ainda,", "Como já se reconheceu no") nem o que vem depois \
    Certo:  "julgado do STM proferido em 2023 pela relatoria de CARLOS AUGUSTO AMARAL OLIVEIRA"
 2. Não invente citações. Se não tiver certeza de que um trecho é uma \
 citação, não o inclua.
-3. Liste SOMENTE as citações SEM número de processo — aquelas em que o \
-julgado é descrito por tribunal, ano e relator, como "julgado do STF \
-proferido em 2024 pela relatoria de Dias Toffoli" ou "precedente do STM de \
-2023, da relatoria de Marco Antonio". Citações que trazem número de \
-processo, súmula ou artigo de lei já são tratadas por outro componente: \
-NÃO as inclua.
+3. Liste SOMENTE as citações que NÃO trazem número identificador — aquelas \
+em que o julgado ou a norma é referido por descrição. Dois casos:
+   - julgado descrito por tribunal, ano e relator: "julgado do STF proferido \
+em 2024 pela relatoria de Dias Toffoli", "precedente do STM de 2023, da \
+relatoria de Marco Antonio", "Rcl de 2021, Rel. Min. Rosa Weber";
+   - norma referida sem o número do artigo: "artigo correspondente do Código \
+de Processo Civil", "o dispositivo legal de regência".
+   Citações que trazem número de processo, número de súmula ou número de \
+artigo já são tratadas por outro componente: NÃO as inclua.
 4. Responda apenas com uma lista JSON, sem texto antes ou depois, onde cada \
 item tem os campos:
    - "trecho": o texto copiado literalmente (obrigatório)
