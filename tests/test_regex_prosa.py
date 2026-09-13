@@ -130,3 +130,21 @@ def test_estado_da_jurisprudencia_nao_e_citacao():
     jurisprudência está assentada; não invoca precedente algum."""
     texto = "Cumpre observar que a orientação dos tribunais superiores é firme no ponto."
     assert trechos(texto) == []
+
+
+def test_formulas_vagas_nao_se_confundem_com_argumentacao():
+    """No corpus, cada fórmula vaga é sempre citação, e a fórmula que afirma
+    o estado da jurisprudência nunca é. A separação é limpa, sem caso em que
+    a mesma redação sirva às duas funções."""
+    sempre_citacao = (
+        "verbete sumular aplicável à espécie",
+        "jurisprudência pacífica desta Corte",
+        "orientação jurisprudencial da Corte Superior",
+        "entendimento sumulado sobre a matéria",
+        "precedente firmado em sede de recurso repetitivo",
+        "lei que disciplina a prescrição no caso",
+        "dispositivo constitucional invocado na origem",
+    )
+    for formula in sempre_citacao:
+        assert formula in trechos(formula), formula
+    assert trechos("a orientação dos tribunais superiores é firme no ponto") == []
