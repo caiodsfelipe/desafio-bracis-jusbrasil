@@ -93,6 +93,31 @@ _PADROES = (
 _COMPILADOS = tuple(re.compile(p) for p in _PADROES)
 
 
+# Um julgado referido em prosa nomeia o tribunal que o proferiu ou o
+# relator que o conduziu. O substantivo sozinho não basta: "o acórdão
+# recorrido" e "a jurisprudência pacífica desta Corte" apontam a decisão
+# em julgamento ou um entendimento difuso, não um precedente identificável,
+# e nenhum dos dois é citação.
+# A citação a norma sem número nomeia o diploma no lugar do tribunal.
+_DIPLOMA_CITADO = (
+    r"C[óo]digo\b|Constitui[çc][ãa]o|Consolida[çc][ãa]o\s+das\s+Leis"
+    r"|Lei\s+(?:Complementar|n)|CPC|CPP|CLT|CDC|CPM|CF/"
+)
+_MARCA_DE_CITACAO = re.compile(
+    rf"{_TRIBUNAL}|Rel(?:at[oa]r[a]?)?\.|Min(?:istr[oa])?\.|relatoria|{_DIPLOMA_CITADO}"
+)
+
+
+def tem_marca_de_julgado(trecho: str) -> bool:
+    """O trecho nomeia quem julgou ou qual norma se invoca.
+
+    Serve para corroborar um trecho que só o modelo apontou: os padrões
+    descrevem as formas conhecidas de citação, e o que escapa a todas elas
+    precisa ao menos nomear um tribunal, um relator ou um diploma.
+    """
+    return bool(_MARCA_DE_CITACAO.search(trecho))
+
+
 def extrair_candidatos(texto: str) -> list[tuple[int, int, str]]:
     """Spans (inicio, fim, trecho) das citações sem identificador."""
     candidatos = []

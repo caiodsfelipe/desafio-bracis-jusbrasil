@@ -8,7 +8,7 @@ nova continue reconhecível.
 """
 import pytest
 
-from regex_prosa import extrair_candidatos
+from regex_prosa import extrair_candidatos, tem_marca_de_julgado
 
 
 def trechos(texto):
@@ -88,3 +88,33 @@ def test_termo_jurisprudencial_nao_engole_a_sumula_seguinte():
     súmula, que o padrão estrutural delimita; o termo em prosa não deve
     absorvê-la."""
     assert trechos("Corrobora esse entendimento a Súmula 935\ndo STF, que") == []
+
+
+@pytest.mark.parametrize(
+    "trecho",
+    [
+        "julgado do STF de 2024",
+        "voto condutor do Min. Barroso",
+        "aresto de 2019, Rel. Luiz Fux",
+        "precedente do TRF4",
+        "artigo correspondente do Código de Processo Civil",
+    ],
+)
+def test_marca_de_julgado_reconhece_citacao(trecho):
+    assert tem_marca_de_julgado(trecho)
+
+
+@pytest.mark.parametrize(
+    "trecho",
+    [
+        "A questão de fundo comporta solução singela",
+        "A parte contrária limita-se a repisar argumentos já superados",
+        "O raciocínio desenvolvido no acórdão recorrido parte de premissa equivocada",
+        "Merece registro a jurisprudência pacífica desta Corte",
+        "Cumpre observar que a orientação dos tribunais superiores é firme no ponto",
+    ],
+)
+def test_marca_de_julgado_recusa_argumentacao(trecho):
+    """O substantivo sozinho não faz citação: "o acórdão recorrido" é a
+    decisão em julgamento, e "desta Corte" não nomeia tribunal algum."""
+    assert not tem_marca_de_julgado(trecho)
