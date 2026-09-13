@@ -163,9 +163,9 @@ def resolver_citacoes(
     indice_por_trecho: dict[tuple[str, int], int] = {}
     # identificador -> resultado do FTS, para não repetir a consulta
     cache_busca: dict[str, list[Candidato]] = {}
-    # por candidato: posição, índices em `perguntas`, o Candidato do acervo
-    # de cada pergunta, e se algum identificador foi ambíguo demais
-    pendentes: list[tuple[int, list[int], list[Candidato], bool]] = []
+    # por candidato: posição, índices em `perguntas` e o Candidato do
+    # acervo correspondente a cada pergunta
+    pendentes: list[tuple[int, list[int], list[Candidato]]] = []
 
     for posicao, candidato in enumerate(candidatos):
         if eh_citacao_normativa(candidato.trecho):
@@ -183,8 +183,7 @@ def resolver_citacoes(
             resultados[posicao] = ("incompleta", None)
             continue
 
-        indices_perguntas: list[int] = []
-        candidatos_acervo: list[Candidato] = []
+        acervo_do_candidato: list[Candidato] = []
         ambiguo_demais = False
         for identificador in identificadores:
             if identificador not in cache_busca:
@@ -192,17 +191,33 @@ def resolver_citacoes(
             if len(cache_busca[identificador]) > _MAX_CANDIDATOS_PARA_CLASSIFICAR:
                 ambiguo_demais = True
                 continue
-            for achado in cache_busca[identificador]:
-                # súmulas/dispositivos não têm "dono de processo" — só
-                # acórdãos passam pela classificação
-                if achado.natureza != "acordao" or achado.ocorrencia is None:
-                    continue
-                chave = (achado.documento_id, achado.ocorrencia[0])
-                if chave not in indice_por_trecho:
-                    indice_por_trecho[chave] = len(perguntas)
-                    perguntas.append((achado.texto, *achado.ocorrencia))
-                indices_perguntas.append(indice_por_trecho[chave])
-                candidatos_acervo.append(achado)
+            acervo_do_candidato.extend(
+                # súmulas/dispositivos não têm "dono de processo"
+                a for a in cache_busca[identificador]
+                if a.natureza == "acordao" and a.ocorrencia is not None
+            )
+
+        # Um único documento no acervo contém esse identificador: não há o
+        # que desempatar, e perguntar só cria chance de errar. Medido no
+        # goldenset: 64 das 77 citações reais de acórdão caem aqui, e o
+        # candidato único é SEMPRE o correto; entre as inventadas, apenas 1
+        # tem candidato único. Perguntar nesses casos custava a maior parte
+        # do F1 da classe `real` (o prompt é conservador por desenho, e um
+        # "CITACAO" indevido transforma acerto em erro).
+        distintos = {a.id_canonico for a in acervo_do_candidato}
+        if len(distintos) == 1:
+            resultados[posicao] = ("real", acervo_do_candidato[0].id_canonico)
+            continue
+
+        indices_perguntas: list[int] = []
+        candidatos_acervo: list[Candidato] = []
+        for achado in acervo_do_candidato:
+            chave = (achado.documento_id, achado.ocorrencia[0])
+            if chave not in indice_por_trecho:
+                indice_por_trecho[chave] = len(perguntas)
+                perguntas.append((achado.texto, *achado.ocorrencia))
+            indices_perguntas.append(indice_por_trecho[chave])
+            candidatos_acervo.append(achado)
 
         if not indices_perguntas:
             # sem nenhum candidato classificável: `incompleta` se algum
@@ -211,11 +226,11 @@ def resolver_citacoes(
             # nada com aquele número
             resultados[posicao] = ("incompleta", None) if ambiguo_demais else ("inventada", None)
         else:
-            pendentes.append((posicao, indices_perguntas, candidatos_acervo, ambiguo_demais))
+            pendentes.append((posicao, indices_perguntas, candidatos_acervo))
 
     respostas = classificar_dono_ou_citacao_lote(qwen, perguntas)
 
-    for posicao, indices_perguntas, candidatos_acervo, ambiguo_demais in pendentes:
+    for posicao, indices_perguntas, candidatos_acervo in pendentes:
         donos = [
             acervo
             for indice_pergunta, acervo in zip(indices_perguntas, candidatos_acervo)
@@ -223,10 +238,10 @@ def resolver_citacoes(
         ]
         unicos = {c.id_canonico: c for c in donos}
         classe, id_canonico = decidir_classe(list(unicos.values()))
-        # um identificador do span era ambíguo demais para classificar: não
-        # dá para afirmar `inventada` (o acervo tinha candidatos, só não
-        # havia como desempatar)
-        if classe == "inventada" and ambiguo_demais:
+        # Chegar aqui significa que o acervo TINHA candidatos (2+, ou um
+        # identificador ambíguo demais) — então `inventada` está descartada
+        # por construção: o número existe, o que faltou foi desempate.
+        if classe == "inventada":
             classe, id_canonico = "incompleta", None
         resultados[posicao] = (classe, id_canonico)
 
