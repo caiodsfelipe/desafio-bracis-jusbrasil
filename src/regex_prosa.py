@@ -33,14 +33,15 @@ _TRIBUNAL = (
     r"|Supremo Tribunal Federal|Superior Tribunal de Justi[çc]a"
     r"|Tribunal Superior do Trabalho|Tribunal Superior Eleitoral"
     r"|Superior Tribunal Militar"
-    r"|Tribunal de Justi[çc]a(?:\s+d[eo]\s+[A-ZÀ-Ý][\wÀ-ÿ]*){0,3}"
-    r"|Corte Especial|Tribunal Pleno)"
+    r"|Tribunal de Justi[çc]a(?:\s+d[eo]\s+[A-ZÀ-Ý][\wÀ-ÿ]*){0,3})"
 )
 
-# O órgão fracionário antecede o tribunal: "da Segunda Turma do STF".
+# O órgão fracionário antecede o tribunal: "da Segunda Turma do STF", "da
+# Corte Especial do STJ".
 _ORGAO_FRACIONARIO = (
-    r"(?:(?:Primeira|Segunda|Terceira|Quarta|Quinta|Sexta|S[ée]tima|Oitava|\d[ªa])"
-    r"\s+(?:Turma|Se[çc][ãa]o|C[âa]mara)\s+d[oa]\s+)?"
+    r"(?:(?:(?:Primeira|Segunda|Terceira|Quarta|Quinta|Sexta|S[ée]tima|Oitava|\d[ªa])"
+    r"\s+(?:Turma|Se[çc][ãa]o|C[âa]mara)|Corte Especial|Tribunal Pleno|[ÓO]rg[ãa]o Especial)"
+    r"\s+d[oa]\s+)?"
 )
 _ORGAO_JULGADOR = rf"{_ORGAO_FRACIONARIO}{_TRIBUNAL}"
 
@@ -62,11 +63,23 @@ _RELATOR = (
 # digitalização corrompe; por isso entra como palavra qualquer.
 _DATA = rf"(?:[\s,]*(?:\w+\s+)?(?:em|{_DE})\s*{_ANO})"
 
+# O adjetivo que qualifica o julgado faz parte da citação, como em
+# "reiterados precedentes". Entre o termo e o órgão cabe ainda o particípio
+# que os liga ("firmado", "consolidada").
+_QUALIFICADOR = (
+    r"(?:(?:reiterad|iterativ|not[óo]ri|pac[íi]fic|remans)[oa]s?\s+)?"
+)
+# O particípio que liga o termo ao órgão, quando existe: "entendimento
+# firmado pelo STJ", "jurisprudência consolidada do TST". A palavra de
+# ligação que vem em seguida não serve como particípio.
+_PARTICIPIO_DE_LIGACAO = rf"(?:(?!{_LIGACAO}\s)[a-zà-ÿ]{{3,}}[oa]s?\s+)?"
+
 _PADROES = (
+    # "reiterados precedentes do Superior Tribunal de Justiça",
     # "julgado do STF proferido em 2024 pela relatoria de Dias Toffoli",
-    # "decisão do STJ de 2020, Rel. Min. Herman Benjamin",
-    # "reiterados precedentes do Superior Tribunal de Justiça"
-    rf"\b{_TERMO_JURISPRUDENCIAL}(?:\s+\w+){{0,3}}\s+{_LIGACAO}\s+{_ORGAO_JULGADOR}"
+    # "entendimento firmado pelo STJ em 2021"
+    rf"\b{_QUALIFICADOR}{_TERMO_JURISPRUDENCIAL}\s+{_PARTICIPIO_DE_LIGACAO}"
+    rf"{_LIGACAO}\s+{_ORGAO_JULGADOR}(?![\wÀ-ÿ])"
     rf"{_DATA}?(?:[\s,]*{_RELATOR})?",
     # "Reclamação do STF, de 2025, Rel. Min. CRISTIANO ZANIN"
     rf"\b{_ESPECIE_DE_RECURSO}\s+d[oa]\s+{_ORGAO_JULGADOR}{_DATA}[\s,]*{_RELATOR}",

@@ -105,9 +105,6 @@ def _iou(a, b):
 def acertos_por_caminho(gabarito, predicoes):
     """Acertos e total de cada caminho de resolução, casando predição e
     gabarito pelo mesmo critério da métrica oficial."""
-    from resolucao import CONFIANCA_POR_CAMINHO
-
-    caminho_da_confianca = {v: k for k, v in CONFIANCA_POR_CAMINHO.items()}
     contagem = collections.defaultdict(lambda: [0, 0])
     for documento, (candidatos, resolucoes) in predicoes.items():
         for candidato, resolucao in zip(candidatos, resolucoes, strict=True):
@@ -120,8 +117,7 @@ def acertos_por_caminho(gabarito, predicoes):
                         int(float(c["id_canonico"])) if c["id_canonico"] else None,
                     )
                     break
-            caminho = caminho_da_confianca.get(resolucao.confianca, "desconhecido")
-            registro = contagem[caminho]
+            registro = contagem[resolucao.caminho]
             registro[0] += esperado == (resolucao.classe, resolucao.id_canonico)
             registro[1] += 1
     return {k: tuple(v) for k, v in sorted(contagem.items())}

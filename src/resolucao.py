@@ -113,17 +113,20 @@ def buscar_candidatos(con: sqlite3.Connection, identificador: str) -> list[Candi
     return candidatos
 
 
-# A confiança é uma propriedade do caminho que resolveu a citação, e cada
-# caminho tem a sua, o que também torna o diagnóstico por caminho legível no
-# relatório de avaliação. Os valores ficam abaixo da certeza absoluta porque
-# nenhum caminho é infalível, e um erro declarado como certeza custa o dobro
-# no cálculo do bônus de calibração.
+# A confiança é uma propriedade do caminho que resolveu a citação, calibrada
+# pela taxa de acerto que o caminho apresenta. Os valores ficam abaixo da
+# certeza absoluta porque nenhum caminho é infalível, e um erro declarado
+# como certeza custa o dobro no cálculo do bônus; mas rebaixá-los além da
+# taxa observada também custa, porque o bônus mede a distância entre a
+# confiança declarada e o acerto efetivo. Dois caminhos podem partilhar o
+# mesmo valor quando acertam na mesma medida: é o caminho que a `Resolucao`
+# carrega, não a confiança, que identifica a origem da decisão.
 CONFIANCA_POR_CAMINHO = {
     "normativo": 0.98,        # súmula ou artigo casado no índice normativo
+    "sem_identificador": 0.98,  # citação em prosa, sem número a resolver
     "registro_unico": 0.97,   # um só registro do acervo contém o identificador
-    "sem_identificador": 0.96,  # citação em prosa, sem número a resolver
-    "sem_candidato": 0.95,    # nenhum registro contém o identificador
-    "cabecalho": 0.94,        # um só registro traz o identificador no cabeçalho
+    "sem_candidato": 0.96,    # nenhum registro contém o identificador
+    "cabecalho": 0.95,        # um só registro traz o identificador no cabeçalho
     "desempate": 0.75,        # vários registros, separados pelo modelo
     "so_mencionado": 0.60,    # o número só aparece citado, nunca como autuação
     "ambiguo": 0.30,          # identificador presente em documentos demais
@@ -135,10 +138,17 @@ class Resolucao:
     classe: str
     id_canonico: int | None
     confianca: float
+    caminho: str
 
     def __iter__(self):
         """Compatível com o desempacotamento em (classe, id_canonico)."""
         return iter((self.classe, self.id_canonico))
+
+
+def resolvido_por(caminho: str, classe: str, id_canonico: int | None = None) -> Resolucao:
+    """Resolução anotada com o caminho que a produziu, de onde vem a
+    confiança declarada."""
+    return Resolucao(classe, id_canonico, CONFIANCA_POR_CAMINHO[caminho], caminho)
 
 
 def _ordem_de_preferencia(candidato: Candidato) -> tuple[int, int]:
@@ -176,7 +186,7 @@ def _desempatar_por_posicao(candidatos: list[Candidato]) -> "Resolucao | None":
     ordenados = _um_por_registro(candidatos)
     no_cabecalho = [c for c in ordenados if c.posicao < _LIMITE_CABECALHO]
     if not no_cabecalho:
-        return Resolucao("inventada", None, CONFIANCA_POR_CAMINHO["so_mencionado"])
+        return resolvido_por("so_mencionado", "inventada")
 
     primeiro = no_cabecalho[0]
     duplicatas = [
@@ -185,15 +195,11 @@ def _desempatar_por_posicao(candidatos: list[Candidato]) -> "Resolucao | None":
         if abs(c.posicao - primeiro.posicao) <= _TOLERANCIA_POSICAO_DUPLICATA
     ]
     if len(duplicatas) > 1:
-        return Resolucao(
-            "real",
-            min(c.id_canonico for c in duplicatas),
-            CONFIANCA_POR_CAMINHO["registro_unico"],
+        return resolvido_por(
+            "registro_unico", "real", min(c.id_canonico for c in duplicatas)
         )
     if len(no_cabecalho) == 1:
-        return Resolucao(
-            "real", primeiro.id_canonico, CONFIANCA_POR_CAMINHO["cabecalho"]
-        )
+        return resolvido_por("cabecalho", "real", primeiro.id_canonico)
     return None
 
 
@@ -217,7 +223,7 @@ def resolver_citacoes(
     """
     from indice_normativo import eh_citacao_normativa, resolver_normativo
     from normalizacao import normalizar_identificadores
-    from prompt_dono import NENHUMA, escolher_registro_lote
+    from prompt_dono import escolher_registro_lote
 
     resultados: list[Resolucao | None] = [None] * len(candidatos)
     disputas: list[tuple[str, list[str]]] = []
@@ -229,19 +235,16 @@ def resolver_citacoes(
     for posicao, candidato in enumerate(candidatos):
         if eh_citacao_normativa(candidato.trecho):
             id_normativo = resolver_normativo(indice_normativo, candidato.trecho)
-            confianca = CONFIANCA_POR_CAMINHO["normativo"]
             resultados[posicao] = (
-                Resolucao("real", id_normativo, confianca)
+                resolvido_por("normativo", "real", id_normativo)
                 if id_normativo is not None
-                else Resolucao("inventada", None, confianca)
+                else resolvido_por("normativo", "inventada")
             )
             continue
 
         identificadores = normalizar_identificadores(candidato.trecho)
         if not identificadores:
-            resultados[posicao] = Resolucao(
-                "incompleta", None, CONFIANCA_POR_CAMINHO["sem_identificador"]
-            )
+            resultados[posicao] = resolvido_por("sem_identificador", "incompleta")
             continue
 
         acervo_do_candidato: list[Candidato] = []
@@ -265,10 +268,8 @@ def resolver_citacoes(
         # Registro único: não há ambiguidade a resolver.
         distintos = {a.id_canonico for a in acervo_do_candidato}
         if len(distintos) == 1:
-            resultados[posicao] = Resolucao(
-                "real",
-                acervo_do_candidato[0].id_canonico,
-                CONFIANCA_POR_CAMINHO["registro_unico"],
+            resultados[posicao] = resolvido_por(
+                "registro_unico", "real", acervo_do_candidato[0].id_canonico
             )
             continue
 
@@ -276,9 +277,9 @@ def resolver_citacoes(
             # Sem candidatos classificáveis: o identificador ambíguo indica
             # que o número existe no acervo mas não identifica um registro.
             resultados[posicao] = (
-                Resolucao("incompleta", None, CONFIANCA_POR_CAMINHO["ambiguo"])
+                resolvido_por("ambiguo", "incompleta")
                 if ambiguo_demais
-                else Resolucao("inventada", None, CONFIANCA_POR_CAMINHO["sem_candidato"])
+                else resolvido_por("sem_candidato", "inventada")
             )
             continue
 
@@ -296,16 +297,8 @@ def resolver_citacoes(
     escolhas = escolher_registro_lote(qwen, disputas)
 
     for (posicao, em_disputa), escolha in zip(pendentes, escolhas, strict=True):
-        # O modelo recusou todas: o número consta do acervo apenas em
-        # fundamentações, e nenhum processo responde por ele.
-        resultados[posicao] = (
-            Resolucao("inventada", None, CONFIANCA_POR_CAMINHO["so_mencionado"])
-            if escolha == NENHUMA
-            else Resolucao(
-                "real",
-                em_disputa[escolha].id_canonico,
-                CONFIANCA_POR_CAMINHO["desempate"],
-            )
+        resultados[posicao] = resolvido_por(
+            "desempate", "real", em_disputa[escolha].id_canonico
         )
 
     if any(r is None for r in resultados):
