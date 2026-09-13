@@ -1,7 +1,6 @@
-# -*- coding: utf-8 -*-
 """
-Índice dos registros normativos do acervo — as súmulas e os dispositivos de
-lei —, construído uma vez e consultado por chave.
+Índice dos registros normativos do acervo, as súmulas e os dispositivos de
+lei, construído uma vez e consultado por chave.
 
 Esses registros não resolvem pelo mesmo caminho dos acórdãos: buscar
 "Súmula 83 do STJ" no índice de texto devolve os acórdãos que a mencionam,
@@ -65,7 +64,8 @@ def _numero_por_citacoes(con: sqlite3.Connection, texto_sumula: str) -> str | No
         for (texto_doc,) in linhas:
             normalizado = " ".join(texto_doc.split())
             for ocorrencia in re.finditer(re.escape(chave), normalizado):
-                antes = normalizado[max(0, ocorrencia.start() - _CONTEXTO_ANTES) : ocorrencia.start()]
+                inicio = max(0, ocorrencia.start() - _CONTEXTO_ANTES)
+                antes = normalizado[inicio : ocorrencia.start()]
                 votos.update(_NUM_SUMULA_CITADA.findall(antes))
     return votos.most_common(1)[0][0] if votos else None
 
@@ -77,8 +77,22 @@ _MARCAS_DE_DIPLOMA: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("codigo_eleitoral", ("Tribunais Regionais são terminativas",)),
     ("codigo_penal_militar", ("ainda que gratuitamente, ter em depósito",)),
     ("cdc", ("fornecedor de serviços responde",)),
-    ("constituicao", ("Estatuto da Magistratura", "direitos dos trabalhadores urbanos", "Todos são iguais perante a lei")),
-    ("clt", ("Recurso de Revista para Turma", "ônus da prova incumbe: (Redação dada", "extinção do contrato de trabalho")),
+    (
+        "constituicao",
+        (
+            "Estatuto da Magistratura",
+            "direitos dos trabalhadores urbanos",
+            "Todos são iguais perante a lei",
+        ),
+    ),
+    (
+        "clt",
+        (
+            "Recurso de Revista para Turma",
+            "ônus da prova incumbe: (Redação dada",
+            "extinção do contrato de trabalho",
+        ),
+    ),
     ("cpp", ("prisão preventiva poderá ser decretada",)),
     ("codigo_civil", ("por ação ou omissão voluntária",)),
     ("lc64", ("São inelegíveis: I - para qualquer cargo",)),
@@ -87,6 +101,8 @@ _MARCAS_DE_DIPLOMA: tuple[tuple[str, tuple[str, ...]], ...] = (
 
 # Formas pelas quais um diploma é citado: nome por extenso, sigla ou o
 # número da lei que o instituiu.
+# A ordem importa: o apelido mais específico vem primeiro, para que
+# "código de processo civil" não seja lido como "código civil".
 _DIPLOMA_NA_CITACAO: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("cpc", ("código de processo civil", "cpc", "13.105", "13105")),
     ("cpp", ("código de processo penal", "cpp")),
@@ -94,9 +110,21 @@ _DIPLOMA_NA_CITACAO: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("cdc", ("código de defesa do consumidor", "cdc", "8.078", "8078")),
     ("clt", ("consolidação das leis do trabalho", "clt", "13.467", "13467")),
     ("codigo_eleitoral", ("código eleitoral", "4.737", "4737")),
-    ("codigo_civil", ("código civil", "10.406", "10406")),
+    ("codigo_civil", ("código civil", "10.406", "10406", " cc", "/cc")),
     ("lc64", ("lei complementar nº 64", "lei complementar 64", "lc 64", "64/1990")),
-    ("constituicao", ("constituição", "cf/88", "carta magna", "constituição da república")),
+    (
+        "constituicao",
+        (
+            "constituição",
+            "cf/88",
+            "cf/1988",
+            "carta magna",
+            "carta constitucional",
+            "constituição da república",
+            "constituição federal",
+            " cf",
+        ),
+    ),
 )
 
 
@@ -146,7 +174,7 @@ def eh_citacao_normativa(trecho: str) -> bool:
 
 def resolver_normativo(indice: dict[tuple[str, ...], int], trecho: str) -> int | None:
     """id_canonico do registro citado, ou None quando o trecho não cita
-    súmula nem artigo, ou quando o registro não existe no acervo —
+    súmula nem artigo, ou quando o registro não existe no acervo,
     inclusive se o número existir em outro diploma."""
     achado = _CITACAO_SUMULA.search(trecho)
     if achado:

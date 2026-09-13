@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Normalização do identificador numérico de uma citação.
 
@@ -6,7 +5,7 @@ Opera apenas dentro do span já delimitado como citação, nunca sobre o
 documento inteiro: a tradução de letras em dígitos só faz sentido onde já
 se sabe haver um número.
 
-Os documentos trazem identificadores com ruído de digitalização — letras
+Os documentos trazem identificadores com ruído de digitalização: letras
 no lugar de dígitos, espaço no meio do número, pontuação parcial ou
 ausente. A saída é a forma que o acervo usa, que é como o índice FTS5
 consegue casá-la.
@@ -28,7 +27,7 @@ _CHARS_NUMERICOS = "0-9OolIGgSs"
 # ponto, e o que separa dois pedaços pode ser um espaço ("1 307 026"), uma
 # quebra de linha ("...5.24.\n0091") ou uma sequência de pontuação
 # ("33.-\n474"). Sem aceitá-los o número se fragmentaria em pedaços curtos
-# demais para identificar coisa alguma — e pedaços curtos casam com
+# demais para identificar coisa alguma, e pedaços curtos casam com
 # documentos que não têm relação com a citação.
 _UNIDADE_NUMERICA = rf"[{_CHARS_NUMERICOS}]"
 _SEPARADOR_INTERNO = r"[.\-]|[ \n\r\t\xa0]"
@@ -43,14 +42,34 @@ _BLOCO_CANDIDATO = re.compile(
 _BORDAS_DESCARTAVEIS = ".- \n\r\t\xa0"
 
 
+# Entre a letra e o dígito que a acompanha pode haver o separador de
+# milhar: em "l.234.567" o "l" é o algarismo inicial do número. Só o ponto
+# separa milhares; o hífen e o espaço separam o número da sigla da UF, e
+# atravessá-los faria do "S" de "SP" um algarismo.
+_SEPARADOR_DE_MILHAR = "."
+
+
+def _vizinho_numerico(bloco: str, i: int, passo: int) -> bool:
+    """Há um dígito adiante na direção dada, alcançável atravessando
+    apenas o separador de milhar."""
+    j = i + passo
+    while 0 <= j < len(bloco):
+        if bloco[j].isdigit():
+            return True
+        if bloco[j] != _SEPARADOR_DE_MILHAR:
+            return False
+        j += passo
+    return False
+
+
 def _eh_letra_isolada(bloco: str, i: int) -> bool:
-    """A letra na posição i não encosta em nenhum dígito, logo não é um
+    """A letra na posição i não acompanha nenhum dígito, logo não é um
     dígito grafado incorretamente."""
     if bloco[i] not in MAPA_OCR:
         return False
-    anterior = bloco[i - 1] if i > 0 else ""
-    seguinte = bloco[i + 1] if i + 1 < len(bloco) else ""
-    return not (anterior.isdigit() or seguinte.isdigit())
+    return not (
+        _vizinho_numerico(bloco, i, -1) or _vizinho_numerico(bloco, i, 1)
+    )
 
 
 def _aparar_letras_isoladas(bloco: str) -> str:
@@ -118,7 +137,7 @@ _PREPOSICAO_ANO = re.compile(r"\b(?:de|em)\s+((?:19|20)\d{2})\b", re.IGNORECASE)
 
 def normalizar_identificadores(span: str) -> list[str]:
     """Identificadores normalizados presentes no span, um por bloco
-    numérico. Lista vazia quando a citação não traz identificador — o
+    numérico. Lista vazia quando a citação não traz identificador, caso do
     julgado referido apenas por tribunal, ano e relator."""
     anos_de_julgado = set(_PREPOSICAO_ANO.findall(span))
     identificadores = []
