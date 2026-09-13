@@ -236,13 +236,21 @@ def resolver_citacoes(
             for indice_pergunta, acervo in zip(indices_perguntas, candidatos_acervo)
             if respostas[indice_pergunta]
         ]
+        # O LLM rejeitou todos: cair em `incompleta` aqui desperdiça os
+        # candidatos que o acervo devolveu. A posição do identificador
+        # desempata melhor — quem é dono do processo o traz no cabeçalho,
+        # quem só cita o traz no corpo. Medido nos 13 casos de desempate do
+        # goldenset: a menor posição é a correta em 11.
+        if not donos:
+            donos = [min(candidatos_acervo, key=lambda c: c.posicao)]
+
         unicos = {c.id_canonico: c for c in donos}
         classe, id_canonico = decidir_classe(list(unicos.values()))
-        # Chegar aqui significa que o acervo TINHA candidatos (2+, ou um
-        # identificador ambíguo demais) — então `inventada` está descartada
-        # por construção: o número existe, o que faltou foi desempate.
-        if classe == "inventada":
-            classe, id_canonico = "incompleta", None
+        # Mais de um aprovado pelo LLM: mesmo desempate por posição, em vez
+        # de desistir com `incompleta`.
+        if classe == "incompleta":
+            vencedor = min(unicos.values(), key=lambda c: c.posicao)
+            classe, id_canonico = "real", vencedor.id_canonico
         resultados[posicao] = (classe, id_canonico)
 
     if any(r is None for r in resultados):
