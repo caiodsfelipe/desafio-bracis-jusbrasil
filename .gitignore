@@ -16,6 +16,9 @@ desafio_bracis_projeto.zip
 *.html
 *_files/
 
+# Gabarito reconstruído (derivado; refaça com `python reconstruir_gabarito.py`)
+gabarito_reconstruido.csv
+
 # Relatórios de avaliação (reconstruíveis com `python avaliar.py --json`)
 relatorio*.json
 

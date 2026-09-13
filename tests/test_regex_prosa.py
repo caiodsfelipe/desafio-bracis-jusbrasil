@@ -89,3 +89,44 @@ def test_termo_jurisprudencial_nao_engole_a_sumula_seguinte():
     absorvê-la."""
     assert trechos("Corrobora esse entendimento a Súmula 935\ndo STF, que") == []
 
+
+
+@pytest.mark.parametrize(
+    "trecho",
+    [
+        "jurisprudência pacífica desta Corte",
+        "orientação jurisprudencial da Corte Superior",
+        "verbete sumular aplicável à espécie",
+        "entendimento sumulado sobre a matéria",
+        "precedentes desta Casa em situações análogas",
+        "precedente firmado em sede de recurso repetitivo",
+        "jurisprudência consolidada dos tribunais superiores",
+        "dispositivo constitucional invocado na origem",
+        "lei que disciplina a prescrição no caso",
+        "normas de regência da matéria",
+        "recente acórdão da Segunda Turma",
+    ],
+)
+def test_referencia_vaga_e_citacao(trecho):
+    """A peça invoca o precedente ou a norma sem nomear número nem tribunal.
+    A referência é real, resolve para nada, e o gabarito a classifica como
+    incompleta."""
+    assert trecho in trechos(trecho)
+
+
+@pytest.mark.parametrize(
+    "trecho",
+    [
+        "entendirnento sumulado sobre a matéria",
+        "jurisprudêneia consolidada dos tribunais superiores",
+    ],
+)
+def test_referencia_vaga_com_ruido_de_digitalizacao(trecho):
+    assert trecho in trechos(trecho)
+
+
+def test_estado_da_jurisprudencia_nao_e_citacao():
+    """"A orientação dos tribunais superiores é firme no ponto" afirma que a
+    jurisprudência está assentada; não invoca precedente algum."""
+    texto = "Cumpre observar que a orientação dos tribunais superiores é firme no ponto."
+    assert trechos(texto) == []

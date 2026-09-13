@@ -4,7 +4,10 @@ O acervo, os documentos e o código vêm do dataset anexado ao notebook. A
 extração é determinística; o modelo é carregado para a única pergunta que a
 estrutura não resolve, separar registros autuados com o mesmo número.
 """
-import csv, os, sqlite3, sys
+import csv
+import os
+import sqlite3
+import sys
 
 BASE = "/kaggle/input/datasets/caiodsfelipe/desafio-bracis-projeto"
 sys.path.insert(0, os.path.join(BASE, "src"))

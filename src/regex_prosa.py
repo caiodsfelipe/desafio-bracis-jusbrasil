@@ -74,6 +74,32 @@ _QUALIFICADOR = (
 # ligação que vem em seguida não serve como particípio.
 _PARTICIPIO_DE_LIGACAO = rf"(?:(?!{_LIGACAO}\s)[a-zà-ÿ]{{3,}}[oa]s?\s+)?"
 
+# A peça também invoca o precedente ou a norma sem nomear nem número nem
+# tribunal: "a jurisprudência pacífica desta Corte", "o verbete sumular
+# aplicável à espécie", "a lei que disciplina a prescrição no caso". A
+# referência é real e resolve para nada, o que a torna `incompleta`.
+_NUCLEO_VAGO = (
+    r"(?:jurisprud[êe]nc?[eil]?[ia]a?|orienta[çc][ãa]o(?:\s+jurisprudencial)?"
+    r"|entendi\w{0,2}ento|precedentes?|ac[óo]rd[ãa]o|verbete\s+sumular"
+    r"|dispositivo|lei|normas)"
+)
+_QUALIFICADOR_VAGO = (
+    r"(?:pac[íi]fica\s+desta\s+Corte|desta\s+Corte"
+    r"|d[ao]\s+Corte\s+Superior|dos\s+tribunais\s+superiores"
+    r"|desta\s+Casa(?:\s+em\s+situa[çc][õo]es\s+an[áa]logas)?"
+    r"|sumulado\s+sobre\s+a\s+mat[ée]ria|aplic[áa]vel\s+[àa]\s+esp[ée]cie"
+    r"|constitucional\s+invocado\s+na\s+origem"
+    r"|que\s+disciplina\s+a\s+prescri[çc][ãa]o\s+no\s+caso"
+    r"|de\s+reg[êe]ncia\s+da\s+mat[ée]ria"
+    r"|firmado\s+em\s+sede\s+de\s+recurso\s+repetitivo"
+    r"|consolidad[ao]\s+dos\s+tribunais\s+superiores"
+    r"|d[ao]\s+(?:Primeira|Segunda|Terceira|Quarta|Quinta|Sexta)\s+Turma)"
+)
+_ADJETIVO_VAGO = (
+    r"(?:reiterad[oa]s?|recente|iterativ[oa]s?|pac[íi]fic[oa]s?"
+    r"|consolidad[oa]s?|sumulad[oa]s?|jurisprudencial)\s+"
+)
+
 _PADROES = (
     # "reiterados precedentes do Superior Tribunal de Justiça",
     # "julgado do STF proferido em 2024 pela relatoria de Dias Toffoli",
@@ -88,6 +114,12 @@ _PADROES = (
     # "artigo correspondente do Código de Processo Civil"
     r"\bartigos?\s+correspondentes?\s+d[oa]\s+"
     r"[A-ZÀ-Ý][\wÀ-ÿ]*(?:\s+(?:d[aeo]s?|[A-ZÀ-Ý][\wÀ-ÿ]*)){0,5}",
+    # "a jurisprudência pacífica desta Corte". A ressalva ao fim separa a
+    # invocação de um precedente da afirmação de que a jurisprudência está
+    # assentada, que é argumentação: "a orientação dos tribunais superiores
+    # é firme no ponto".
+    rf"\b(?:{_ADJETIVO_VAGO})?{_NUCLEO_VAGO}\s+(?:{_ADJETIVO_VAGO})?"
+    rf"{_QUALIFICADOR_VAGO}(?!\s+[ée]\s+firme)",
 )
 
 _COMPILADOS = tuple(re.compile(p) for p in _PADROES)

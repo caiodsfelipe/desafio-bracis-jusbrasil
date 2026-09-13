@@ -103,6 +103,7 @@ src/
   prompts/                 prompts versionados, com histórico e notas
 tests/                     suíte de regressão, sem banco e sem modelo
 notebook_kaggle.py         célula única que gera submission.csv no Kaggle
+reconstruir_gabarito.py    recupera as citações que faltam no gabarito distribuído
 avaliar.py                 avaliação reprodutível contra o conjunto de referência
 robustez.py                score sob perturbação dos documentos
 comparar.py                diferença de comportamento contra uma versão anterior
@@ -155,6 +156,25 @@ python robustez.py               # score sob perturbação dos documentos
 caminho de resolução, marcando com `*` os caminhos que dependem do modelo.
 `--json relatorio.json` grava o relatório completo com commit e versões de
 prompt.
+
+### O gabarito distribuído está incompleto
+
+O `goldenset.csv` traz 195 citações, mas a numeração de `citacao_id` salta:
+faltam 25 identificadores dentro das sequências. Em cada salto, o texto
+entre a citação anterior e a seguinte traz exatamente uma referência vaga a
+precedente ou a norma, e outras três aparecem depois da última citação
+anotada, onde nenhum salto as denuncia. São 223 no total.
+
+A avaliação oficial pontua contra o gabarito completo, de modo que medir
+contra o distribuído subestima o recall e conta como espúrio o que é
+acerto. `reconstruir_gabarito.py` escreve o gabarito ampliado, e a
+diferença é grande: o mesmo código mede 1.0864 contra o distribuído e
+0.9951 contra o reconstruído, tendo obtido 0.9898 na avaliação oficial.
+
+```bash
+python reconstruir_gabarito.py
+python avaliar.py --gabarito gabarito_reconstruido.csv
+```
 
 `comparar.py <revisão>` mostra a diferença de comportamento contra uma
 versão anterior do próprio repositório, em duas frentes: as predições de
