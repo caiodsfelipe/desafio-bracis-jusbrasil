@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Prompt de classificação "dono vs citação" via LLM (Qwen3-8B).
+Prompt que decide se o número destacado num trecho identifica o processo
+do próprio documento ou uma decisão citada dentro dele.
 
-Diferente da extração de span (prompt_extracao.py), esta tarefa não tem
-risco de alucinação: o modelo não gera nem localiza nada, só classifica
-um trecho de texto que já existe e cuja posição já conhecemos. A pergunta
-é fechada e a resposta é restrita a duas palavras — não há espaço para o
-modelo "inventar" texto que precisaria de verificação posterior.
+A pergunta é fechada e a resposta se limita a duas palavras. O modelo não
+produz nem localiza texto: julga um trecho já delimitado.
 """
 
 PROMPT_SISTEMA = """Você analisa um trecho de um documento jurídico (acórdão) \
@@ -53,10 +51,8 @@ O número destacado é o DONO deste documento ou uma CITACAO a outro processo?""
 
 
 def montar_contexto_com_marcacao(texto: str, inicio: int, fim: int, janela: int = 150) -> str:
-    """Extrai uma janela de texto ao redor do identificador (posições
-    já conhecidas — vêm de buscar_candidatos) e marca visualmente o
-    identificador com [[ ]], para o modelo saber exatamente qual número
-    está em análise (pode haver outros números na mesma janela)."""
+    """Janela de texto ao redor do identificador, com ele destacado entre
+    [[ ]], já que a janela pode conter outros números."""
     ini_janela = max(0, inicio - janela)
     fim_janela = min(len(texto), fim + janela)
     return (
@@ -69,11 +65,8 @@ def montar_contexto_com_marcacao(texto: str, inicio: int, fim: int, janela: int 
 def classificar_dono_ou_citacao_lote(
     qwen: "QwenClassificador", contextos: list[tuple[str, int, int]]
 ) -> list[bool]:
-    """Versão em lote: uma passada pela GPU para vários candidatos.
-
-    `contextos` é uma lista de (texto, inicio, fim). A resposta útil tem 1
-    token, então em série o custo é quase todo overhead — em lote, dezenas
-    de classificações custam praticamente o mesmo que uma."""
+    """Classifica vários contextos (texto, inicio, fim) numa única
+    passada pela GPU."""
     if not contextos:
         return []
     prompts = [
@@ -87,13 +80,9 @@ def classificar_dono_ou_citacao_lote(
 
 
 def classificar_dono_ou_citacao(qwen: "QwenClassificador", texto: str, inicio: int, fim: int) -> bool:
-    """True = documento é o dono do processo; False = citação a terceiro.
-    Qualquer resposta que não seja exatamente "DONO" é tratada como
-    CITACAO — mesmo viés conservador do prompt (na dúvida, não assume
-    dono), aplicado também a respostas mal-formadas do modelo."""
+    """Verdadeiro quando o documento é o processo citado. Qualquer
+    resposta diferente de "DONO" é lida como citação a terceiro."""
     contexto = montar_contexto_com_marcacao(texto, inicio, fim)
-    # resposta esperada é 1 palavra ("DONO" ou "CITACAO") — max_novos_tokens
-    # pequeno evita gerar até 512 tokens à toa, acelera bastante em lote
     resposta = qwen.gerar(
         PROMPT_SISTEMA,
         PROMPT_USUARIO_TEMPLATE.format(contexto_com_marcacao=contexto),

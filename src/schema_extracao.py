@@ -2,32 +2,20 @@
 """
 Schema da saída do extrator via LLM.
 
-Por que Pydantic e não Instructor/Outlines: rodamos o modelo via
-transformers puro (ver llm_qwen.py — vLLM foi descartado por risco de
-instalação no Kaggle), então não há `guided_json` nem constrained decoding
-disponível. As bibliotecas de saída estruturada acrescentariam dependência
-ao bundle reproduzível exigido pelas regras sem garantir mais do que
-conseguimos aqui: o prompt define o contrato, e este schema VALIDA a
-resposta, descartando o que não conformar em vez de confiar no modelo.
+O prompt define o formato esperado e este schema valida o que chega,
+descartando itens que não o respeitem. O modelo devolve apenas o texto da
+citação: a posição é recuperada depois, procurando o trecho no documento
+original, porque um modelo de linguagem não conta caracteres com precisão.
 
-Campos escolhidos a partir do que o pipeline precisa decidir depois:
-- `trecho`: única coisa que o modelo copia; a posição (inicio/fim) é
-  recuperada em Python por busca no texto original (verificacao_substring),
-  nunca informada pelo modelo — LLM não conta caracteres de forma confiável.
-- `tribunal`/`ano`/`relator`: metadados da citação em prosa sem número
-  ("julgado do STF de 2024, relator Dias Toffoli"). É o que permite a
-  consulta por metadados que caracteriza a `incompleta` buscável (resolve
-  para dezenas de candidatos -> sem critério de desempate).
-- `e_numero_do_proprio_documento`: marca o distrator do cabeçalho (o número
-  dos autos da própria peça, que a documentação do desafio diz não ser
-  citação e contar como falso positivo se extraído).
+Os metadados de tribunal, ano e relator acompanham as citações que
+descrevem o julgado sem dar seu número.
 """
 from pydantic import BaseModel, Field, ValidationError
 
 
 class CitacaoExtraida(BaseModel):
     trecho: str = Field(
-        description="Texto da citação copiado literalmente do documento, caractere por caractere."
+        description="Texto da citação copiado literalmente do documento."
     )
     tribunal: str | None = Field(
         default=None, description="Sigla do tribunal, se mencionada (STF, STJ, TST, TSE, STM)."
@@ -40,20 +28,18 @@ class CitacaoExtraida(BaseModel):
     )
     e_numero_do_proprio_documento: bool = Field(
         default=False,
-        description="True se este número identifica o processo da própria peça (cabeçalho/autos), não uma citação.",
+        description="Verdadeiro quando o número identifica o processo da própria peça, não uma citação.",
     )
 
 
 def parsear_resposta(texto_resposta: str) -> list[CitacaoExtraida]:
-    """Converte a resposta bruta do LLM na lista validada de citações.
-    Descarta silenciosamente qualquer item que não conforme ao schema —
-    resposta mal-formada é tratada como ausência de citação, nunca como
-    dado a ser 'consertado' (mesmo viés conservador do resto do pipeline).
-    Retorna [] se a resposta inteira for inválida."""
+    """Citações válidas presentes na resposta. Itens fora do formato são
+    descartados, e uma resposta inteiramente inválida resulta em lista
+    vazia."""
     import json
 
     texto = texto_resposta.strip()
-    # o modelo às vezes embrulha o JSON em cerca de código markdown
+    # a resposta pode vir envolta em cerca de código
     if texto.startswith("```"):
         texto = texto.split("```")[1] if "```" in texto[3:] else texto[3:]
         texto = texto.removeprefix("json").strip()
@@ -61,11 +47,8 @@ def parsear_resposta(texto_resposta: str) -> list[CitacaoExtraida]:
     try:
         dados = json.loads(texto)
     except json.JSONDecodeError:
-        # Resposta truncada (o orçamento de tokens acabou no meio do último
-        # item) é o caso comum, não exceção: um documento com muitas
-        # citações estoura qualquer limite razoável. Descartar a resposta
-        # inteira perderia todos os itens já completos, então recuperamos
-        # objeto a objeto.
+        # A resposta pode terminar no meio de um item, quando o limite de
+        # tokens é atingido; os itens completos ainda são aproveitáveis.
         dados = _objetos_completos(texto)
     if not isinstance(dados, list):
         return []
@@ -80,10 +63,9 @@ def parsear_resposta(texto_resposta: str) -> list[CitacaoExtraida]:
 
 
 def _objetos_completos(texto: str) -> list[dict]:
-    """Extrai os objetos JSON de nível 1 que estão completos, ignorando um
-    eventual objeto truncado no fim. Rastreia aspas e escapes para não se
-    confundir com chaves dentro de strings (o trecho citado pode conter
-    '{' ou '}')."""
+    """Objetos JSON completos do primeiro nível, ignorando um item
+    truncado ao fim. Aspas e escapes são rastreados para que chaves dentro
+    de strings não sejam confundidas com delimitadores."""
     import json
 
     objetos = []

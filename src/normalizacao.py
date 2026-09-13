@@ -1,22 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-Normalização do identificador numérico dentro de um span já identificado
-como citação (ROI local — nunca aplicada ao documento inteiro).
+Normalização do identificador numérico de uma citação.
 
-Mapeamento letra->dígito validado empiricamente contra o goldenset (ver
-memória do projeto): O/o->0, l/I->1, S/s->5, G->6, g->9. Uma letra só é
-tratada como dígito disfarçado quando está imediatamente colada (sem
-espaço) a pelo menos um dígito real dentro do mesmo bloco — isso evita
-confundir sigla pura (ex. "RESP", só letras) com número disfarçado
-(ex. "21737l8", letra colada a dígitos).
+Opera apenas dentro do span já delimitado como citação, nunca sobre o
+documento inteiro: a tradução de letras em dígitos só faz sentido onde já
+se sabe haver um número.
 
-Números CNJ (e variantes menores) já vêm com pontuação própria no texto
-(traços/pontos separando sequencial-DV.ano.segmento.tribunal.origem) — o
-FTS5 casa essa pontuação bem como está (cada segmento vira um token).
-Reagrupar do zero destruiria essa estrutura. Por isso: bloco com pontuação
-própria -> só traduz letra->dígito, preserva a pontuação; bloco sem
-nenhuma pontuação (sequência crua) -> reagrupa de 3 em 3, que é a forma
-de separador de milhar usada no acervo.
+Os documentos trazem identificadores com ruído de digitalização — letras
+no lugar de dígitos, espaço no meio do número, pontuação parcial ou
+ausente. A saída é a forma que o acervo usa, que é como o índice FTS5
+consegue casá-la.
 """
 import re
 
@@ -30,17 +23,11 @@ MAPA_OCR = {
 
 _CHARS_NUMERICOS = "0-9OolIGgSs"
 
-# bloco: dígitos/letras-disfarçadas, podendo ter pontuação (. ou -) ou
-# espaço ENTRE dois caracteres numéricos — não no início/fim, para não
-# engolir a pontuação/palavras de fora da citação. Espaço entra como cola
-# válida porque o nível 2 usa espaço solto como separador de milhar
-# ruidoso (ex. "1 307 026", "1. 570.531") — sem isso, cada pedaço vira um
-# bloco separado e minúsculo, que também casa em qualquer parte do banco.
-#
-# Mas hífen com espaço DOS DOIS LADOS ("21737l8 - SP") é o padrão de
-# separador antes da UF, não separador de milhar — nunca cola nesse caso,
-# senão o sufixo UF gruda no número (a letra da UF passa a ser lida como
-# dígito disfarçado, já que está na lista de confusões OCR).
+# Um bloco numérico admite ponto, traço e espaço entre dois caracteres,
+# nunca nas bordas: o espaço aparece como separador de milhar ruidoso
+# ("1 307 026"), e sem aceitá-lo o número se fragmentaria em pedaços curtos
+# demais para identificar coisa alguma. O hífen cercado de espaços é
+# exceção — separa a UF do número ("21737l8 - SP") e não faz parte dele.
 _UNIDADE_NUMERICA = rf"[{_CHARS_NUMERICOS}]"
 _COLA = rf"(?:{_UNIDADE_NUMERICA}|\.|-(?!\s)(?<!\s-)| )"
 _BLOCO_CANDIDATO = re.compile(
@@ -48,49 +35,41 @@ _BLOCO_CANDIDATO = re.compile(
 )
 
 
-def _aparar_letras_isoladas(bloco: str) -> str:
-    """Corta das bordas do bloco qualquer letra do MAPA_OCR que não esteja
-    colada a um dígito real — ela não faz parte do número, é ruído que
-    grudou na extração (ex. o "O" de "REG." antes de "76.532", separado
-    por espaço: o bloco bruto "O 76.532" vira "76.532"). Repete até a
-    borda ser um dígito real ou uma letra já colada a um."""
-    def eh_letra_isolada(i: int) -> bool:
-        if bloco[i] not in MAPA_OCR:
-            return False
-        anterior = bloco[i - 1] if i > 0 else ""
-        seguinte = bloco[i + 1] if i + 1 < len(bloco) else ""
-        return not (anterior.isdigit() or seguinte.isdigit())
+def _eh_letra_isolada(bloco: str, i: int) -> bool:
+    """A letra na posição i não encosta em nenhum dígito, logo não é um
+    dígito grafado incorretamente."""
+    if bloco[i] not in MAPA_OCR:
+        return False
+    anterior = bloco[i - 1] if i > 0 else ""
+    seguinte = bloco[i + 1] if i + 1 < len(bloco) else ""
+    return not (anterior.isdigit() or seguinte.isdigit())
 
+
+def _aparar_letras_isoladas(bloco: str) -> str:
+    """Remove das bordas do bloco as letras que não pertencem ao número,
+    como a última letra de uma abreviação vizinha."""
     inicio, fim = 0, len(bloco)
-    while inicio < fim and eh_letra_isolada(inicio):
+    while inicio < fim and _eh_letra_isolada(bloco, inicio):
         inicio += 1
-    while fim > inicio and eh_letra_isolada(fim - 1):
+    while fim > inicio and _eh_letra_isolada(bloco, fim - 1):
         fim -= 1
     return bloco[inicio:fim]
 
 
 def _traduzir_letras(bloco: str) -> str:
-    """Traduz uma letra do MAPA_OCR só quando ela está imediatamente
-    colada (sem espaço) a pelo menos um dígito real — nunca quando está
-    isolada (cercada por espaço/pontuação/borda do bloco). Sem essa
-    checagem posição a posição, uma letra solta que sobrou perto de um
-    número por coincidência (ex. o "O" de "REG." antes de "76.532", com
-    espaço entre eles) seria lida como dígito disfarçado."""
+    """Converte em dígito cada letra encostada num dígito verdadeiro,
+    preservando as demais."""
     resultado = []
     for i, ch in enumerate(bloco):
-        if ch in MAPA_OCR:
-            anterior = bloco[i - 1] if i > 0 else ""
-            seguinte = bloco[i + 1] if i + 1 < len(bloco) else ""
-            colada_a_digito = anterior.isdigit() or seguinte.isdigit()
-            resultado.append(MAPA_OCR[ch] if colada_a_digito else ch)
+        if ch in MAPA_OCR and not _eh_letra_isolada(bloco, i):
+            resultado.append(MAPA_OCR[ch])
         else:
             resultado.append(ch)
     return "".join(resultado)
 
 
 def _reagrupar(digitos: str) -> str:
-    """'2173718' -> '2.173.718' (agrupa de 3 em 3 a partir da direita).
-    Espera receber só dígitos — quem chama remove espaço/pontuação antes."""
+    """Insere o separador de milhar: '2173718' vira '2.173.718'."""
     partes = []
     while digitos:
         partes.append(digitos[-3:])
@@ -102,13 +81,9 @@ _DIGITOS_CNJ = 20
 
 
 def _formatar_cnj(digitos: str) -> str:
-    """'06003164920206160182' -> '0600316-49.2020.6.16.0182'.
-
-    O CNJ tem estrutura fixa (sequencial 7, dígito verificador 2, ano 4,
-    segmento 1, tribunal 2, origem 4), então com 20 dígitos a pontuação é
-    reconstruível sem ambiguidade. O nível 2 entrega esses números com
-    pontuação parcial ou nenhuma ("0600316-4920206160182"), e o acervo os
-    grava pontuados — sem reconstruir, a busca por frase no FTS não casa."""
+    """Aplica a máscara do número único do CNJ, cuja estrutura é fixa:
+    sequencial, dígito verificador, ano, segmento, tribunal e origem.
+    '06003164920206160182' vira '0600316-49.2020.6.16.0182'."""
     return (
         f"{digitos[:7]}-{digitos[7:9]}.{digitos[9:13]}"
         f".{digitos[13]}.{digitos[14:16]}.{digitos[16:20]}"
@@ -123,33 +98,22 @@ def _normalizar_bloco(bloco: str) -> str:
     if len(so_digitos) == _DIGITOS_CNJ:
         return _formatar_cnj(so_digitos)
     if any(c in ".-" for c in bloco):
-        # já vem estruturado por ponto/traço: espaço aqui é ruído de
-        # digitação (nunca separador de milhar), remove e preserva o resto
+        # a pontuação original já estrutura o número; o espaço é ruído
         return traduzido.replace(" ", "").replace("\xa0", "")
-    # sem pontuação própria: espaço solto é separador de milhar ruidoso
-    # (ex. "1 307 026") — remove tudo e reagrupa de 3 em 3
     return _reagrupar(so_digitos)
 
 
-# Ano precedido de preposição ("de 2024", "em 2023") é data do julgado, não
-# identificador — mesma regra já validada na extração por regex. Sem isso,
-# uma citação em prosa ("julgado do STF de 2024, relator X"), que não tem
-# identificador algum e deve ser `incompleta`, devolveria "2.024" e seria
-# buscada no FTS como se fosse número de processo.
+# Ano precedido de preposição é a data do julgamento, não um identificador.
 _PREPOSICAO_ANO = re.compile(r"\b(?:de|em)\s+((?:19|20)\d{2})\b", re.IGNORECASE)
 
 
 def normalizar_identificadores(span: str) -> list[str]:
-    """Extrai e normaliza cada bloco numérico do span, um por vez (não
-    concatena blocos distintos — um span pode ter mais de um número
-    relevante, ex. "Súmula 331 do TST" tem só um bloco, mas alguns rótulos
-    trazem número de processo E ano em blocos separados por texto).
-    Lista vazia = span sem identificador buscável (prosa livre, ou só um
-    ano de julgamento)."""
+    """Identificadores normalizados presentes no span, um por bloco
+    numérico. Lista vazia quando a citação não traz identificador — o
+    julgado referido apenas por tribunal, ano e relator."""
     anos_de_julgado = set(_PREPOSICAO_ANO.findall(span))
-    blocos = _BLOCO_CANDIDATO.findall(span)
     identificadores = []
-    for bloco in blocos:
+    for bloco in _BLOCO_CANDIDATO.findall(span):
         if not any(c.isdigit() for c in bloco):
             continue
         normalizado = _normalizar_bloco(bloco)

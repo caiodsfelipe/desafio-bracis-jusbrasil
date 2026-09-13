@@ -1,22 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-Índice dos 18 registros normativos do acervo (5 súmulas + 13 dispositivos
-de lei), construído uma vez e consultado por chave.
+Índice dos registros normativos do acervo — as súmulas e os dispositivos de
+lei —, construído uma vez e consultado por chave.
 
-Por que um índice à parte: súmulas e dispositivos NÃO resolvem pelo mesmo
-caminho dos acórdãos. Buscar "Súmula 83 do STJ" no FTS devolve dezenas de
-acórdãos que a mencionam — nenhum deles é a súmula. Os registros de
-natureza sumula/dispositivo existem para ser o alvo da resolução, e são
-poucos o bastante para carregar em memória e casar por número.
+Esses registros não resolvem pelo mesmo caminho dos acórdãos: buscar
+"Súmula 83 do STJ" no índice de texto devolve os acórdãos que a mencionam,
+nunca a súmula em si. Como são poucos, ficam indexados em memória.
 
-Como o número é obtido (nenhum hardcode do goldenset — tudo derivado do
-acervo):
-- Dispositivos: o texto começa com "Art. N." — basta ler o número.
-- Súmulas: 3 das 5 trazem o número no rodapé do próprio enunciado, no
-  formato "(SÚMULA 443, TERCEIRA SEÇÃO, julgado em ...)". Para as 2 que
-  não trazem (STF e TST), o número é derivado por votação: procura-se o
-  enunciado citado dentro de acórdãos do acervo e lê-se o número que
-  aparece imediatamente antes da citação ("Súmula 331 do TST, ...").
+O número de cada registro vem do próprio acervo. Nos dispositivos, o texto
+abre com "Art. N.". Nas súmulas, quando o enunciado traz o número no
+rodapé, ele é lido dali; nas demais, o enunciado é procurado dentro dos
+acórdãos que o citam, e vale o número que mais vezes o antecede.
 """
 import re
 import sqlite3
@@ -30,17 +24,15 @@ _NUM_SUMULA_CITADA = re.compile(
 )
 _NUM_ARTIGO = re.compile(r"^\s*Art(?:igo)?\.?\s*(\d{1,4})", re.IGNORECASE)
 
-# Gatilhos usados para LER a citação no documento de entrada (não o acervo).
-# Toleram o ruído de OCR do nível 2 na própria palavra-gatilho: o goldenset
-# traz "5úmula 211 do STJ" (S->5) e "Súm. 166 do TSE" (abreviada). O ruído
-# no número em si é tratado em normalizacao.py; aqui é só na palavra.
+# Padrões para ler a citação no documento de entrada. A palavra-chave pode
+# vir abreviada ("Súm. 166 do TSE") ou com ruído de digitalização
+# ("5úmula 211 do STJ"); o ruído no número é tratado em normalizacao.py.
 _CITACAO_SUMULA = re.compile(
     r"[S5]["
     r"úuÚU]m(?:ula)?\.?\s+(?:Vinculante\s+)?(?:n[º°.]?\s*)?(\d{1,3})",
     re.IGNORECASE,
 )
-# captura o número COM eventual ponto de milhar ("art. 1.134" -> "1.134"),
-# senão "1.134" seria lido como "1" e casaria com o art. 1º da LC 64
+# O ponto de milhar faz parte do número: "art. 1.134" é o artigo 1134.
 _CITACAO_ARTIGO = re.compile(r"art(?:igo)?\.?\s*(\d{1,3}(?:\.\d{3})*)", re.IGNORECASE)
 
 _PALAVRAS_POR_JANELA = 8
@@ -49,9 +41,8 @@ _CONTEXTO_ANTES = 150
 
 
 def _janelas(texto: str):
-    """Fatias do enunciado usadas como chave de busca por frase. Várias
-    janelas ao longo do texto, para não depender de acertar onde termina o
-    cabeçalho temático em caixa alta."""
+    """Fatias do enunciado usadas como chave de busca, distribuídas ao
+    longo do texto para não depender de onde termina o cabeçalho."""
     palavras = " ".join(texto.split()).split()
     limite = min(len(palavras) - _PALAVRAS_POR_JANELA, _JANELAS_POR_SUMULA * _PALAVRAS_POR_JANELA)
     for i in range(0, max(limite, 1), _PALAVRAS_POR_JANELA):
@@ -59,8 +50,8 @@ def _janelas(texto: str):
 
 
 def _numero_por_citacoes(con: sqlite3.Connection, texto_sumula: str) -> str | None:
-    """Deriva o número da súmula lendo o que a precede quando ela é citada
-    em acórdãos do acervo. Votação: o número mais frequente vence."""
+    """Número da súmula, lido do que a antecede nos acórdãos que a citam;
+    vence o mais frequente."""
     votos = Counter()
     for chave in _janelas(texto_sumula):
         try:
@@ -70,7 +61,7 @@ def _numero_por_citacoes(con: sqlite3.Connection, texto_sumula: str) -> str | No
                 (f'"{chave}"',),
             ).fetchall()
         except sqlite3.OperationalError:
-            continue  # chave com caractere que o FTS rejeita
+            continue  # chave com caractere não aceito pelo índice
         for (texto_doc,) in linhas:
             normalizado = " ".join(texto_doc.split())
             for ocorrencia in re.finditer(re.escape(chave), normalizado):
@@ -79,13 +70,9 @@ def _numero_por_citacoes(con: sqlite3.Connection, texto_sumula: str) -> str | No
     return votos.most_common(1)[0][0] if votos else None
 
 
-# O número do artigo sozinho não identifica o dispositivo: o art. 290 do
-# acervo é do Código Penal Militar, e o goldenset traz "art 290 da
-# Constituição Federal" como `inventada`. O diploma precisa bater.
-#
-# Os textos do acervo não nomeiam o próprio diploma, então ele é derivado
-# de palavras características do conteúdo de cada artigo (cada tupla é
-# casada contra o texto do registro; a primeira que casar vence).
+# O número do artigo não identifica o dispositivo sozinho: o mesmo número
+# existe em códigos diferentes. Como os textos do acervo não nomeiam o
+# próprio diploma, ele é deduzido de trechos característicos do conteúdo.
 _MARCAS_DE_DIPLOMA: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("codigo_eleitoral", ("Tribunais Regionais são terminativas",)),
     ("codigo_penal_militar", ("ainda que gratuitamente, ter em depósito",)),
@@ -98,8 +85,8 @@ _MARCAS_DE_DIPLOMA: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("cpc", ("ônus da prova incumbe: I - ao autor",)),
 )
 
-# Como o diploma é escrito nas citações (goldenset): nome por extenso,
-# sigla, ou o número da lei que o instituiu.
+# Formas pelas quais um diploma é citado: nome por extenso, sigla ou o
+# número da lei que o instituiu.
 _DIPLOMA_NA_CITACAO: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("cpc", ("código de processo civil", "cpc", "13.105", "13105")),
     ("cpp", ("código de processo penal", "cpp")),
@@ -130,9 +117,8 @@ def _diploma_da_citacao(trecho: str) -> str | None:
 
 
 def construir_indice(con: sqlite3.Connection) -> dict[tuple[str, ...], int]:
-    """Mapa de chave -> id_canonico. Súmulas: ("sumula", numero).
-    Dispositivos: ("artigo", numero, diploma) — o diploma faz parte da
-    chave porque o mesmo número de artigo existe em diplomas diferentes."""
+    """Mapa de chave para id_canonico: ("sumula", numero) e
+    ("artigo", numero, diploma)."""
     indice: dict[tuple[str, ...], int] = {}
     for id_canonico, natureza, texto in con.execute(
         "SELECT id, natureza, texto FROM documentos WHERE natureza IN ('sumula', 'dispositivo')"
@@ -151,19 +137,17 @@ def construir_indice(con: sqlite3.Connection) -> dict[tuple[str, ...], int]:
 
 
 def eh_citacao_normativa(trecho: str) -> bool:
-    """O trecho cita uma súmula ou um artigo de lei? Independe de o
-    registro existir na cobertura — serve para o roteamento: uma citação
-    normativa que não resolve é `inventada`, e NÃO deve seguir para a
-    busca de acórdão no FTS (onde o número solto casaria em qualquer
-    documento que o mencione)."""
+    """O trecho cita uma súmula ou um artigo de lei, exista ou não o
+    registro no acervo. Uma citação normativa que não resolve é
+    `inventada` e não deve seguir para a busca de acórdãos, onde o número
+    casaria com qualquer documento que o mencione."""
     return bool(_CITACAO_SUMULA.search(trecho) or _CITACAO_ARTIGO.search(trecho))
 
 
 def resolver_normativo(indice: dict[tuple[str, ...], int], trecho: str) -> int | None:
-    """id_canonico do registro normativo citado no trecho, ou None se o
-    trecho não for citação de súmula/artigo, ou se o registro não estiver
-    na cobertura congelada — inclusive quando o número existe mas em outro
-    diploma (nesse caso a citação é `inventada`, decidido por quem chama)."""
+    """id_canonico do registro citado, ou None quando o trecho não cita
+    súmula nem artigo, ou quando o registro não existe no acervo —
+    inclusive se o número existir em outro diploma."""
     achado = _CITACAO_SUMULA.search(trecho)
     if achado:
         return indice.get(("sumula", achado.group(1)))
