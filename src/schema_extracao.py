@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Schema da saída do extrator via LLM.
 
@@ -28,7 +27,10 @@ class CitacaoExtraida(BaseModel):
     )
     e_numero_do_proprio_documento: bool = Field(
         default=False,
-        description="Verdadeiro quando o número identifica o processo da própria peça, não uma citação.",
+        description=(
+            "Verdadeiro quando o número identifica o processo da própria "
+            "peça, não uma citação."
+        ),
     )
 
 
@@ -66,6 +68,7 @@ def _objetos_completos(texto: str) -> list[dict]:
     """Objetos JSON completos do primeiro nível, ignorando um item
     truncado ao fim. Aspas e escapes são rastreados para que chaves dentro
     de strings não sejam confundidas com delimitadores."""
+    import contextlib
     import json
 
     objetos = []
@@ -92,9 +95,7 @@ def _objetos_completos(texto: str) -> list[dict]:
         elif caractere == "}":
             profundidade -= 1
             if profundidade == 0 and inicio is not None:
-                try:
+                with contextlib.suppress(json.JSONDecodeError):
                     objetos.append(json.loads(texto[inicio : posicao + 1]))
-                except json.JSONDecodeError:
-                    pass
                 inicio = None
     return objetos

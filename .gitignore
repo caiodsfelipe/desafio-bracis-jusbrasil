@@ -16,11 +16,17 @@ desafio_bracis_projeto.zip
 *.html
 *_files/
 
+# Relatórios de avaliação (reconstruíveis com `python avaliar.py --json`)
+relatorio*.json
+
 # Python
 __pycache__/
 *.py[cod]
 .venv/
 venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
 
 # macOS
 .DS_Store

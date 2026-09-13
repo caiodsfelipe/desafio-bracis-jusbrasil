@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Resolução de citações contra o acervo canônico.
 
@@ -8,7 +7,7 @@ e a classe resulta da contagem: um único registro é `real`, nenhum é
 `inventada`, vários sem critério de desempate é `incompleta`.
 
 A busca é exata, via FTS5 por frase, sem nenhuma etapa de similaridade
-semântica — números de processo próximos identificam processos distintos.
+semântica: números de processo próximos identificam processos distintos.
 """
 import re
 import sqlite3
@@ -34,7 +33,7 @@ _MAX_CANDIDATOS_PARA_CLASSIFICAR = 8
 # Um acórdão traz o próprio número no cabeçalho, junto da data, do órgão
 # julgador e das partes; quem apenas o cita traz o número no corpo do voto,
 # milhares de caracteres adiante. O cabeçalho varia de tamanho entre os
-# tribunais — no TST a autuação alcança mil e cem caracteres —, e o limite
+# tribunais, e no TST a autuação alcança mil e cem caracteres; o limite
 # acomoda o mais longo deles. Medido sobre o acervo, o identificador do
 # processo dono aparece antes deste ponto em 76 dos 77 casos, contra 3 dos
 # 24 dos documentos que só o mencionam.
@@ -100,19 +99,17 @@ def buscar_candidatos(con: sqlite3.Connection, identificador: str) -> list[Candi
     return candidatos
 
 
-# A confiança declarada em cada predição alimenta o bônus de calibração da
-# avaliação, que compara a confiança ao acerto efetivo. Ela é uma
-# propriedade do caminho que resolveu a citação: um registro único no
-# acervo decide por si, enquanto um desempate entre vários candidatos é
-# inerentemente menos seguro. Os valores ficam abaixo da certeza absoluta
-# porque nenhum caminho é infalível, e um erro declarado como certeza custa
-# o dobro no cálculo do bônus.
+# A confiança é uma propriedade do caminho que resolveu a citação, e cada
+# caminho tem a sua, o que também torna o diagnóstico por caminho legível no
+# relatório de avaliação. Os valores ficam abaixo da certeza absoluta porque
+# nenhum caminho é infalível, e um erro declarado como certeza custa o dobro
+# no cálculo do bônus de calibração.
 CONFIANCA_POR_CAMINHO = {
     "normativo": 0.98,        # súmula ou artigo casado no índice normativo
-    "sem_identificador": 0.98,  # citação em prosa, sem número a resolver
     "registro_unico": 0.97,   # um só registro do acervo contém o identificador
-    "sem_candidato": 0.96,    # nenhum registro contém o identificador
-    "cabecalho": 0.95,        # um só registro traz o identificador no cabeçalho
+    "sem_identificador": 0.96,  # citação em prosa, sem número a resolver
+    "sem_candidato": 0.95,    # nenhum registro contém o identificador
+    "cabecalho": 0.94,        # um só registro traz o identificador no cabeçalho
     "desempate": 0.75,        # vários registros, separados pelo modelo
     "so_mencionado": 0.60,    # o número só aparece citado, nunca como autuação
     "ambiguo": 0.30,          # identificador presente em documentos demais
@@ -157,7 +154,7 @@ def _desempatar_por_posicao(candidatos: list[Candidato]) -> "Resolucao | None":
     acervo e qualquer uma responde pela citação.
 
     Quando nenhum registro traz o número no cabeçalho, o número aparece no
-    acervo apenas dentro de fundamentações — é citado, nunca autuado — e
+    acervo apenas dentro de fundamentações, é citado e nunca autuado, e
     não existe processo com ele: a citação é inventada. É o que distingue
     uma referência a processo inexistente de uma referência legítima, já
     que ambas encontram documentos na busca por texto.
@@ -198,8 +195,8 @@ def resolver_citacoes(
     Súmulas e artigos de lei resolvem pelo índice normativo, que aponta
     para os registros próprios desses dispositivos; buscá-los no FTS
     devolveria os acórdãos que os mencionam. Os demais são buscados pelo
-    identificador normalizado. Citações sem identificador — o julgado
-    referido apenas por tribunal, ano e relator — são `incompleta`.
+    identificador normalizado. Citações sem identificador, o julgado
+    referido apenas por tribunal, ano e relator, são `incompleta`.
 
     O trabalho determinístico de todos os candidatos é feito primeiro, e
     as perguntas ao LLM seguem numa única chamada em lote.
@@ -279,7 +276,7 @@ def resolver_citacoes(
 
     escolhas = escolher_registro_lote(qwen, disputas)
 
-    for (posicao, em_disputa), escolha in zip(pendentes, escolhas):
+    for (posicao, em_disputa), escolha in zip(pendentes, escolhas, strict=True):
         # O modelo recusou todas: o número consta do acervo apenas em
         # fundamentações, e nenhum processo responde por ele.
         resultados[posicao] = (

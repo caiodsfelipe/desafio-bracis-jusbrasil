@@ -1,9 +1,8 @@
-# -*- coding: utf-8 -*-
 """
 Extração de candidatos a citação.
 
-Fontes independentes percorrem o mesmo texto — os padrões estruturais e o
-LLM — e seus resultados são mesclados numa lista única e deduplicada. O
+Fontes independentes percorrem o mesmo texto, os padrões estruturais e o
+LLM, e seus resultados são mesclados numa lista única e deduplicada. O
 span de cada trecho devolvido pelo LLM é resolvido contra o texto original
 antes de entrar na lista.
 """
@@ -29,8 +28,8 @@ class CandidatoCitacao:
         return self.fim - self.inicio
 
 
-# O preâmbulo da peça — endereçamento, número dos autos, qualificação das
-# partes, inscrição na OAB — concentra números que têm a forma de citação
+# O preâmbulo da peça, com endereçamento, número dos autos, qualificação
+# das partes e inscrição na OAB, concentra números que têm a forma de citação
 # sem serem citação: os autos do próprio documento, protocolo, valor da
 # causa. A primeira citação de fato só aparece depois da abertura do texto.
 _FIM_DO_PREAMBULO = 400

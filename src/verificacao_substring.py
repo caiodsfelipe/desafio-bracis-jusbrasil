@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 """
 Localização, no texto original, do trecho devolvido pelo LLM.
 
 As posições saem em codepoints Unicode com fim exclusivo. A única diferença
 tolerada entre o trecho e o texto é o espaço em branco, que o modelo tende
-a normalizar ao copiar. Qualquer outra divergência — uma letra ou um dígito
-distinto — reprova o trecho, porque os identificadores trazem ruído de
+a normalizar ao copiar. Qualquer outra divergência, uma letra ou um dígito
+distinto, reprova o trecho, porque os identificadores trazem ruído de
 digitalização de propósito e uma correção do modelo produziria um span que
 não corresponde ao documento.
 

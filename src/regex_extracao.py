@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Extração de citações com identificador por padrões estruturais.
 
@@ -11,7 +10,7 @@ resultados são mesclados em extracao.py.
 import re
 
 # O nome do recurso encadeia palavras em maiúscula ligadas por preposições
-# e pela conjunção — "Suspensão de Liminar e de Sentença".
+# e pela conjunção, como em "Suspensão de Liminar e de Sentença".
 _CONECTORES = r"(?:em|no|na|nos|nas|de|da|do|das|dos|e)"
 # O "N" de "Nº" pertence ao conector do número, não ao nome do recurso.
 _TOKEN_MAIUSCULO = r"(?!N[º°](?!\w))[A-ZÀ-Ý][A-Za-zÀ-ÿ.\-]*"
@@ -24,7 +23,7 @@ _CONECTOR_NUMERO = r"(?:[nN][º°o.]\s*)?"
 _LETRAS_OCR = "OolIGgSs"
 _UNIDADE = rf"(?:\d|[{_LETRAS_OCR}](?=[\d.\-]*\d))"
 _CORPO_IDENTIFICADOR = rf"(?:{_UNIDADE}|[.\-/:°ºnN() \n\xa0])*"
-# O número termina em dígito, ou na letra que substitui o último dígito —
+# O número termina em dígito, ou na letra que substitui o último dígito,
 # nunca numa letra que inicia a palavra seguinte.
 _FIM_IDENTIFICADOR = rf"(?:\d|(?<=\d)[{_LETRAS_OCR}](?![A-Za-zÀ-ÿ]))"
 # O número tem ao menos dois algarismos: um dígito solto é parte do texto,
@@ -54,8 +53,8 @@ _PADRAO_TEMA = re.compile(
 
 # Dispositivo de lei: "art. 373, I, do CPC", "artigo 7º, XXIX, da
 # Constituição Federal", "art. 1º, I, 'g', da Lei Complementar nº 64/1990".
-# O diploma faz parte da identidade da citação — o mesmo número de artigo
-# existe em códigos diferentes —, por isso o padrão vai até ele.
+# O diploma faz parte da identidade da citação, já que o mesmo número de
+# artigo existe em códigos diferentes, por isso o padrão vai até ele.
 _INCISOS = r"(?:\s*,\s*(?:[IVXLC]+|[a-z]|§\s*\d+[º°]?(?:-[A-Z])?|'[a-z]'|\"[a-z]\"))*"
 # O nome do diploma começa em maiúscula ou é uma sigla, e admite
 # conectores em minúscula e quebra de linha adiante.

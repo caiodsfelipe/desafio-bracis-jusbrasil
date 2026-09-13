@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Interface com o Qwen3-8B para as duas tarefas do pipeline que dependem de
 compreensão de texto: a extração das citações em prosa que escapam aos
@@ -114,5 +113,7 @@ class QwenClassificador:
             )
         return respostas
 
-    def gerar(self, prompt_sistema: str, prompt_usuario: str, max_novos_tokens: int = 512) -> RespostaLLM:
+    def gerar(
+        self, prompt_sistema: str, prompt_usuario: str, max_novos_tokens: int = 512
+    ) -> RespostaLLM:
         return self.gerar_lote(prompt_sistema, [prompt_usuario], max_novos_tokens)[0]
