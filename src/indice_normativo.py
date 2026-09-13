@@ -31,8 +31,11 @@ _CITACAO_SUMULA = re.compile(
     r"úuÚU]m(?:ula)?\.?\s+(?:Vinculante\s+)?(?:n[º°.]?\s*)?(\d{1,3})",
     re.IGNORECASE,
 )
-# O ponto de milhar faz parte do número: "art. 1.134" é o artigo 1134.
-_CITACAO_ARTIGO = re.compile(r"art(?:igo)?\.?\s*(\d{1,3}(?:\.\d{3})*)", re.IGNORECASE)
+# O ponto de milhar faz parte do número: "art. 1.134" é o artigo 1134. A
+# digitalização às vezes entrega o separador como espaço.
+_CITACAO_ARTIGO = re.compile(
+    r"art(?:igo)?\.?\s*(\d{1,3}(?:[. ]\d{3})*)", re.IGNORECASE
+)
 
 _PALAVRAS_POR_JANELA = 8
 _JANELAS_POR_SUMULA = 6
@@ -181,7 +184,7 @@ def resolver_normativo(indice: dict[tuple[str, ...], int], trecho: str) -> int |
         return indice.get(("sumula", achado.group(1)))
     achado = _CITACAO_ARTIGO.search(trecho)
     if achado:
-        numero = achado.group(1).replace(".", "")  # "1.134" -> "1134"
+        numero = re.sub(r"[. ]", "", achado.group(1))  # "1.134" -> "1134"
         diploma = _diploma_da_citacao(trecho)
         if diploma:
             return indice.get(("artigo", numero, diploma))

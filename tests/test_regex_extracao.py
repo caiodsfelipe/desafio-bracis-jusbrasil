@@ -94,3 +94,29 @@ def test_numero_administrativo_nao_e_citacao(texto):
 )
 def test_artigo_antes_do_recurso_nao_bloqueia_a_citacao(texto):
     assert texto in trechos(texto)
+
+
+@pytest.mark.parametrize(
+    "texto",
+    [
+        "Recurso Especial nº l904603/TO",
+        "Recurso Especial nº  l3770l9/ SP",
+        "Recl. n° 6G.838/ BA",
+    ],
+)
+def test_letra_no_lugar_do_primeiro_algarismo(texto):
+    """A digitalização troca também o primeiro dígito; o número segue
+    reconhecível desde que traga dois algarismos verdadeiros."""
+    assert texto in trechos(texto)
+
+
+@pytest.mark.parametrize(
+    "texto, esperado",
+    [
+        ("artigo 1 143 da CLT", "artigo 1 143 da CLT"),
+        ("art. 1 105 do Código de Processo Civil", "art. 1 105 do Código de Processo Civil"),
+        ("art. 1.134 do CPC", "art. 1.134 do CPC"),
+    ],
+)
+def test_separador_de_milhar_como_espaco(texto, esperado):
+    assert esperado in trechos(texto)

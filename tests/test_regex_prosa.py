@@ -57,3 +57,8 @@ def test_tolera_ruido_no_padrao_e_na_preposicao():
 
 def test_texto_sem_citacao_nao_produz_candidato():
     assert trechos("A questão de fundo comporta solução singela.") == []
+
+
+def test_participio_corrompido_nao_impede_a_citacao():
+    trecho = "acórdão do STJ julgadc em 2021 sob relatoria de Assusete Magalhães"
+    assert trecho in trechos(trecho)

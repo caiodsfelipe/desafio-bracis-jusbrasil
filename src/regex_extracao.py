@@ -26,9 +26,16 @@ _CORPO_IDENTIFICADOR = rf"(?:{_UNIDADE}|[.\-/:°ºnN() \n\xa0])*"
 # O número termina em dígito, ou na letra que substitui o último dígito,
 # nunca numa letra que inicia a palavra seguinte.
 _FIM_IDENTIFICADOR = rf"(?:\d|(?<=\d)[{_LETRAS_OCR}](?![A-Za-zÀ-ÿ]))"
+# O número pode começar pela letra que substitui o primeiro algarismo, como
+# em "l904603", desde que a sequência contenha um algarismo verdadeiro. Sem
+# essa exigência, qualquer palavra iniciada por essas letras abriria um
+# identificador.
+_INICIO_IDENTIFICADOR = (
+    rf"(?:\d|[{_LETRAS_OCR}](?=[\d{_LETRAS_OCR}.\-]*\d[\d{_LETRAS_OCR}.\-]*\d))"
+)
 # O número tem ao menos dois algarismos: um dígito solto é parte do texto,
 # não identificador de processo.
-_IDENTIFICADOR = rf"\d{_CORPO_IDENTIFICADOR}{_FIM_IDENTIFICADOR}"
+_IDENTIFICADOR = rf"{_INICIO_IDENTIFICADOR}{_CORPO_IDENTIFICADOR}{_FIM_IDENTIFICADOR}"
 _SUFIXO_UF = r"(?:\s*[-/–(]\s*[A-Z]{2}\)?)?"
 
 _PADRAO_CITACAO = re.compile(
@@ -45,8 +52,11 @@ _PADRAO_SUMULA = re.compile(
 
 # Tema de repercussão geral e tema de recursos repetitivos identificam o
 # precedente pelo número do tema, não pelo número do processo.
+# O separador de milhar do número do artigo é o ponto, que a digitalização
+# às vezes entrega como espaço: "art. 1 105" é o artigo 1105.
+_NUMERO_COM_MILHAR = r"\d{1,3}(?:[. ]\d{3})*"
 _PADRAO_TEMA = re.compile(
-    r"\bTem[aãáà]\s+\d[\d.]*"
+    rf"\bTem[aãáà]\s+{_NUMERO_COM_MILHAR}"
     r"(?:\s+d[oa]s?\s+(?:repercuss[ãa]o\s+geral|recursos?\s+repetitivos?))?",
     re.IGNORECASE,
 )
@@ -67,7 +77,7 @@ _DIPLOMA = (
 # A distinção de caixa delimita o nome do diploma, separando-o do texto
 # que vem depois; por isso o padrão é sensível a maiúsculas.
 _PADRAO_ARTIGO = re.compile(
-    rf"\b[Aa]rt(?:igo)?\.?\s*\d{{1,3}}(?:\.\d{{3}})*[º°]?{_INCISOS}"
+    rf"\b[Aa]rt(?:igo)?\.?\s*{_NUMERO_COM_MILHAR}[º°]?{_INCISOS}"
     rf"\s*,?\s*d[aeo]s?\s+{_DIPLOMA}"
 )
 
