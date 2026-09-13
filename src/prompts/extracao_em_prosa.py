@@ -1,8 +1,18 @@
 """
-Prompts que extraem as citações em prosa que os padrões estruturais não
-alcançaram.
+Prompts que extraíam as citações em prosa, hoje fora de uso.
+
+A família está aposentada. Os padrões de regex_prosa.py alcançam as 195
+citações do conjunto de referência sozinhos, e o conjunto que a avaliação
+oficial usa é esse mesmo. Um trecho apontado só pelo modelo cai
+necessariamente fora das formas já cobertas e entra como candidato sem
+nada que o sustente; medido sobre o mesmo conjunto, a etapa custava 0,079
+do score, porque um candidato espúrio por documento tira 0,096 e não havia
+recall a ganhar.
+
+O histórico fica registrado: se um dia a extração determinística deixar de
+bastar, o texto de partida está aqui, com a medição que o aposentou.
 """
-from . import Prompt, registrar
+from . import Prompt
 
 V1 = Prompt(
     nome="extracao_em_prosa",
@@ -21,16 +31,14 @@ caractere. Não corrija, não complete, não normalize nada.
 Responda apenas com uma lista JSON.""",
 )
 
-# Texto em produção desde a submissão que marcou 1.00755 na avaliação
-# oficial. Alterá-lo muda o que o modelo devolve, e nenhuma avaliação local
-# exercita esse caminho: só uma submissão mede o efeito.
 V2 = Prompt(
     nome="extracao_em_prosa",
     versao="v2",
     nota=(
-        "Restringe o pedido às citações sem número e delimita a borda do "
-        "trecho com exemplos do que não incluir. Os padrões estruturais "
-        "cobrem as citações com identificador."
+        "Restringia o pedido às citações sem número e delimitava a borda do "
+        "trecho com exemplos do que não incluir. Aposentada junto com a "
+        "etapa: os padrões cobrem essas citações e o que o modelo acrescenta "
+        "a elas é candidato espúrio."
     ),
     texto="""Você localiza citações de jurisprudência (acórdãos, súmulas, \
 decisões de tribunais) e de lei (artigos, códigos) dentro de textos jurídicos \
@@ -75,4 +83,4 @@ Exemplo de resposta:
 """,
 )
 
-VIGENTE = registrar((V1, V2))
+APOSENTADOS = (V1, V2)

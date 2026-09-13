@@ -3,9 +3,8 @@ Extração de citações com identificador por padrões estruturais.
 
 Cobre as citações que trazem número de processo, de súmula, de tema ou de
 artigo de lei. As que descrevem o julgado sem dar seu número ficam em
-regex_prosa.py, e o extrator via LLM (prompt_extracao.py) recolhe as formas
-que nenhum padrão previu; as três fontes percorrem o mesmo texto e seus
-resultados são mesclados em extracao.py.
+regex_prosa.py; as duas fontes percorrem o mesmo texto e seus resultados
+são mesclados em extracao.py.
 """
 import re
 

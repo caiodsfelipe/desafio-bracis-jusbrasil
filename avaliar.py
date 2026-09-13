@@ -11,9 +11,9 @@ Uso:
     python avaliar.py --com-modelo    carrega o Qwen3-8B e usa o pipeline completo
     python avaliar.py --json saida.json
 
-Sem modelo, as perguntas ao LLM recebem a primeira opção como resposta, que
-é a escolha determinística de menor risco; o relatório informa quantas
-citações dependeram dela.
+A extração é determinística. O modelo só é consultado para separar
+registros do acervo autuados com o mesmo número, e sem ele essas perguntas
+recebem a primeira opção como resposta; o relatório informa quantas foram.
 """
 import argparse
 import collections
@@ -79,17 +79,12 @@ def _celula_da_predicao(candidatos, resolucoes):
     return "|".join(partes) or "-"
 
 
-def prever(con, modelo, indice, texto, com_modelo):
+def prever(con, modelo, indice, texto):
     """Candidatos e resoluções de um documento."""
     from extracao import extrair_todos
     from resolucao import resolver_citacoes
 
-    citacoes_do_llm = None
-    if com_modelo:
-        from prompt_extracao import extrair_citacoes
-
-        citacoes_do_llm = extrair_citacoes(modelo, texto)
-    candidatos = extrair_todos(texto, citacoes_do_llm)
+    candidatos = extrair_todos(texto)
     if not candidatos:
         return [], []
     return candidatos, resolver_citacoes(con, modelo, indice, candidatos)
@@ -160,7 +155,6 @@ def main():
 
     from indice_normativo import construir_indice
     from prompts.escolha_de_registro import VIGENTE as PROMPT_ESCOLHA
-    from prompts.extracao_em_prosa import VIGENTE as PROMPT_EXTRACAO
 
     con = sqlite3.connect(argumentos.acervo)
     indice = construir_indice(con)
@@ -176,7 +170,7 @@ def main():
     solucao, submissao, predicoes = [], [], {}
     for documento in sorted(gabarito):
         texto = Path(argumentos.documentos, f"{documento}.txt").read_text(encoding="utf-8")
-        candidatos, resolucoes = prever(con, modelo, indice, texto, argumentos.com_modelo)
+        candidatos, resolucoes = prever(con, modelo, indice, texto)
         predicoes[documento] = (candidatos, resolucoes)
         solucao.append(
             {
@@ -202,10 +196,7 @@ def main():
 
     relatorio = {
         "commit": versao_do_codigo(),
-        "prompts": {
-            PROMPT_ESCOLHA.nome: PROMPT_ESCOLHA.versao,
-            PROMPT_EXTRACAO.nome: PROMPT_EXTRACAO.versao,
-        },
+        "prompts": {PROMPT_ESCOLHA.nome: PROMPT_ESCOLHA.versao},
         "modelo": "Qwen/Qwen3-8B" if argumentos.com_modelo else "ausente",
         "consultas_ao_modelo": getattr(modelo, "chamadas", None),
         "score_final": resultado["score_final"],

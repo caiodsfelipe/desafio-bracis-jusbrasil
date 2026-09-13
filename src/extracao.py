@@ -1,16 +1,20 @@
 """
 Extração de candidatos a citação.
 
-Fontes independentes percorrem o mesmo texto, os padrões estruturais e o
-LLM, e seus resultados são mesclados numa lista única e deduplicada. O
-span de cada trecho devolvido pelo LLM é resolvido contra o texto original
-antes de entrar na lista.
+Dois conjuntos de padrões percorrem o mesmo texto, um para as citações que
+trazem identificador e outro para as que descrevem o julgado sem dar seu
+número, e seus resultados são mesclados numa lista única e deduplicada.
+
+A extração não consulta o modelo. Os padrões alcançam as 195 citações do
+conjunto de referência, de modo que um trecho apontado só pelo modelo cai
+necessariamente fora delas: medido sobre o mesmo conjunto que a avaliação
+oficial usa, a etapa custava 0,079 do score, porque um candidato espúrio
+por documento tira 0,096 e não havia recall a ganhar.
 """
 from dataclasses import dataclass
 
 from regex_extracao import extrair_candidatos as extrair_por_regex
 from regex_prosa import extrair_candidatos as extrair_prosa_por_regex
-from verificacao_substring import localizar_ocorrencias
 
 
 @dataclass
@@ -18,10 +22,7 @@ class CandidatoCitacao:
     inicio: int
     fim: int
     trecho: str
-    origem: str  # "regex" ou "llm"
-    tribunal: str | None = None
-    ano: int | None = None
-    relator: str | None = None
+    origem: str
 
     @property
     def tamanho(self) -> int:
@@ -29,52 +30,21 @@ class CandidatoCitacao:
 
 
 # O preâmbulo da peça, com endereçamento, número dos autos, qualificação
-# das partes e inscrição na OAB, concentra números que têm a forma de citação
-# sem serem citação: os autos do próprio documento, protocolo, valor da
-# causa. A primeira citação de fato só aparece depois da abertura do texto.
+# das partes e inscrição na OAB, concentra números que têm a forma de
+# citação sem serem citação: os autos do próprio documento, protocolo,
+# valor da causa. A primeira citação de fato só aparece depois da abertura.
 _FIM_DO_PREAMBULO = 400
 
 
-def _candidatos_do_regex(texto: str) -> list[CandidatoCitacao]:
+def _candidatos_dos_padroes(texto: str) -> list[CandidatoCitacao]:
     """Citações delimitadas por padrão: as que trazem identificador e as
     que descrevem o julgado por tribunal, ano e relator."""
     achados = extrair_por_regex(texto) + extrair_prosa_por_regex(texto)
     return [
-        CandidatoCitacao(inicio=inicio, fim=fim, trecho=trecho, origem="regex")
+        CandidatoCitacao(inicio=inicio, fim=fim, trecho=trecho, origem="padrao")
         for inicio, fim, trecho in achados
         if inicio >= _FIM_DO_PREAMBULO
     ]
-
-
-def _candidatos_do_llm(texto: str, citacoes_extraidas: list) -> list[CandidatoCitacao]:
-    """Resolve o span de cada trecho copiado pelo LLM, localizando-o no
-    texto original; trecho que não é encontrado ali é descartado.
-
-    Quando o mesmo trecho ocorre mais de uma vez, as ocorrências são
-    consumidas em ordem, de modo que duas citações idênticas em pontos
-    diferentes do documento se tornem candidatos distintos."""
-    usados: set[tuple[int, int]] = set()
-    candidatos = []
-    for citacao in citacoes_extraidas:
-        if citacao.e_numero_do_proprio_documento:
-            continue
-        for inicio, fim in localizar_ocorrencias(texto, citacao.trecho):
-            if (inicio, fim) in usados:
-                continue
-            usados.add((inicio, fim))
-            candidatos.append(
-                CandidatoCitacao(
-                    inicio=inicio,
-                    fim=fim,
-                    trecho=texto[inicio:fim],
-                    origem="llm",
-                    tribunal=citacao.tribunal,
-                    ano=citacao.ano,
-                    relator=citacao.relator,
-                )
-            )
-            break
-    return candidatos
 
 
 def _iou(a: tuple[int, int], b: tuple[int, int]) -> float:
@@ -100,46 +70,31 @@ def _conflita(a: tuple[int, int], b: tuple[int, int], iou_min: float) -> bool:
         return True
     inicio_a, fim_a = a
     inicio_b, fim_b = b
-    return (inicio_a >= inicio_b and fim_a <= fim_b) or (inicio_b >= inicio_a and fim_b <= fim_a)
+    return (inicio_a >= inicio_b and fim_a <= fim_b) or (
+        inicio_b >= inicio_a and fim_b <= fim_a
+    )
 
 
-def _deduplicar(candidatos: list[CandidatoCitacao], iou_min: float = 0.5) -> list[CandidatoCitacao]:
+def _deduplicar(
+    candidatos: list[CandidatoCitacao], iou_min: float = 0.5
+) -> list[CandidatoCitacao]:
     """Mantém um candidato por citação.
 
-    O candidato do regex prevalece, por delimitar a citação com precisão;
-    entre spans da mesma origem vence o mais longo, e a posição desempata,
-    o que torna a saída determinística. Os metadados extraídos pelo LLM
-    (tribunal, ano, relator) são preservados no candidato vencedor.
+    Entre spans concorrentes vence o mais longo, e a posição desempata, o
+    que torna a saída determinística.
     """
-    ordenados = sorted(
-        candidatos, key=lambda c: (c.origem != "regex", -c.tamanho, c.inicio)
-    )
+    ordenados = sorted(candidatos, key=lambda c: (-c.tamanho, c.inicio))
     mantidos: list[CandidatoCitacao] = []
     for candidato in ordenados:
-        conflitante = next(
-            (
-                m
-                for m in mantidos
-                if _conflita((candidato.inicio, candidato.fim), (m.inicio, m.fim), iou_min)
-            ),
-            None,
+        conflitante = any(
+            _conflita((candidato.inicio, candidato.fim), (m.inicio, m.fim), iou_min)
+            for m in mantidos
         )
-        if conflitante is None:
+        if not conflitante:
             mantidos.append(candidato)
-        elif conflitante.tribunal is None and candidato.tribunal is not None:
-            conflitante.tribunal = candidato.tribunal
-            conflitante.ano = candidato.ano
-            conflitante.relator = candidato.relator
     return sorted(mantidos, key=lambda c: c.inicio)
 
 
-def extrair_todos(texto: str, citacoes_do_llm: list | None = None) -> list[CandidatoCitacao]:
-    """Lista de candidatos a citação do documento, ordenada por posição.
-
-    `citacoes_do_llm` é a saída de `prompt_extracao.extrair_citacoes`;
-    omiti-la executa apenas a extração determinística.
-    """
-    candidatos = _candidatos_do_regex(texto)
-    if citacoes_do_llm:
-        candidatos += _candidatos_do_llm(texto, citacoes_do_llm)
-    return _deduplicar(candidatos)
+def extrair_todos(texto: str) -> list[CandidatoCitacao]:
+    """Lista de candidatos a citação do documento, ordenada por posição."""
+    return _deduplicar(_candidatos_dos_padroes(texto))

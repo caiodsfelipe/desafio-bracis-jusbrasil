@@ -107,9 +107,7 @@ def main():
             texto = Path(argumentos.documentos, f"{documento}.txt").read_text(
                 encoding="utf-8"
             )
-            candidatos, resolucoes = prever(
-                con, modelo, indice, perturbar(texto), com_modelo=False
-            )
+            candidatos, resolucoes = prever(con, modelo, indice, perturbar(texto))
             submissao.append(
                 {
                     "documento_id": documento,

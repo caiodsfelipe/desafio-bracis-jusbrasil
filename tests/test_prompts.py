@@ -11,11 +11,11 @@ import pytest
 from prompt_dono import NENHUMA, _indice_da_resposta, montar_opcoes
 from prompts import Prompt, registrar
 from prompts.escolha_de_registro import VIGENTE as ESCOLHA
-from prompts.extracao_em_prosa import VIGENTE as EXTRACAO
+from prompts.extracao_em_prosa import APOSENTADOS as EXTRACAO_APOSENTADOS
 
 
-@pytest.mark.parametrize("prompt", [ESCOLHA, EXTRACAO])
-def test_prompt_vigente_tem_versao_e_nota(prompt):
+@pytest.mark.parametrize("prompt", [ESCOLHA, *EXTRACAO_APOSENTADOS])
+def test_prompt_tem_versao_e_nota(prompt):
     assert prompt.versao.startswith("v")
     assert prompt.nota and prompt.texto
 
@@ -57,13 +57,10 @@ def test_opcoes_sao_numeradas_a_partir_de_um():
 # caminho do modelo, de modo que uma reescrita do prompt muda o resultado
 # sem alterar nada que se possa medir aqui. Alterar um destes valores é
 # declarar que a mudança é deliberada e que será medida numa submissão.
-SOMAS_EM_PRODUCAO = {
-    "escolha_de_registro@v2": "e7240aaff50ed877",
-    "extracao_em_prosa@v2": "85613353af97ddec",
-}
+SOMAS_EM_PRODUCAO = {"escolha_de_registro@v2": "e7240aaff50ed877"}
 
 
-@pytest.mark.parametrize("prompt", [ESCOLHA, EXTRACAO])
+@pytest.mark.parametrize("prompt", [ESCOLHA])
 def test_texto_em_producao_nao_mudou(prompt):
     soma = hashlib.sha256(prompt.texto.encode()).hexdigest()[:16]
     assert soma == SOMAS_EM_PRODUCAO[prompt.identificador], (

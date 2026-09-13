@@ -56,10 +56,16 @@ import json, os, sqlite3, sys
 sys.path.insert(0, {str(fonte)!r})
 sys.path.insert(0, {str(RAIZ)!r})
 from comparar import ModeloEspiao
-from indice_normativo import construir_indice
 from extracao import extrair_todos
-from prompt_extracao import extrair_citacoes
+from indice_normativo import construir_indice
 from resolucao import resolver_citacoes
+
+# A versão comparada pode ter uma etapa de extração pelo modelo que a outra
+# não tem. Cada uma roda o próprio pipeline, para que a diferença apareça.
+try:
+    from prompt_extracao import extrair_citacoes
+except ImportError:
+    extrair_citacoes = None
 
 con = sqlite3.connect({acervo!r})
 indice = construir_indice(con)
@@ -67,7 +73,10 @@ predicoes = {{}}
 espiao = ModeloEspiao()
 for nome in sorted(f[:-4] for f in os.listdir({documentos!r}) if f.endswith(".txt")):
     texto = open(os.path.join({documentos!r}, nome + ".txt"), encoding="utf-8").read()
-    candidatos = extrair_todos(texto, extrair_citacoes(espiao, texto))
+    if extrair_citacoes is None:
+        candidatos = extrair_todos(texto)
+    else:
+        candidatos = extrair_todos(texto, extrair_citacoes(espiao, texto))
     resolucoes = resolver_citacoes(con, espiao, indice, candidatos) if candidatos else []
     predicoes[nome] = [
         [c.inicio, c.fim, r.classe, r.id_canonico, round(r.confianca, 4)]
@@ -111,7 +120,8 @@ def main():
     for nome in divergentes[:10]:
         print(f"    {nome}")
     print(
-        f"prompts ao LLM   {len(antes['prompts'])} enviados, "
+        f"prompts ao LLM   {len(antes['prompts'])} antes, "
+        f"{len(agora['prompts'])} agora, "
         f"{'iguais' if prompts_iguais else 'DIFERENTES'}"
     )
     if not prompts_iguais:

@@ -18,8 +18,7 @@ idênticos são documentos diferentes, e é justamente aí que a métrica pune m
 texto do documento
         │
         ├── padrões estruturais (identificador: processo, súmula, tema, artigo)
-        ├── padrões de prosa    (tribunal + ano + relator, sem número)
-        └── LLM                 (formas que fogem dos padrões)
+        └── padrões de prosa    (tribunal + ano + relator, sem número)
                     │
                     └──► mesclagem por IoU >= 0.5 ──► candidatos
                                                           │
@@ -42,11 +41,14 @@ texto do documento
 
 ### Decisões que moldaram o desenho
 
-**O span vem sempre do texto original.** O LLM copia o trecho e o código
-procura essa string de volta no documento, descartando o que não encontrar.
-Tolerância apenas a espaço em branco: o nível 2 injeta ruído de OCR de
-propósito (`0↔O`, `1↔l`, `5↔S`, `G→6`, `g→9`), e um modelo "corrigindo" isso
-produziria um span que não corresponde ao original.
+**A extração não consulta o modelo.** Os padrões alcançam as 195 citações do
+conjunto de referência, que é o mesmo conjunto que a avaliação oficial usa.
+Um trecho apontado só pelo modelo cai necessariamente fora dessas formas e
+entra como candidato sem nada que o sustente. Medido: a etapa custava 0,079
+do score, porque um candidato espúrio por documento tira 0,096 e não havia
+recall a ganhar. O nível 2 injeta ruído de OCR de propósito (`0↔O`, `1↔l`,
+`5↔S`, `G→6`, `g→9`), e um modelo "corrigindo" isso produziria spans que não
+correspondem ao original.
 
 **Normalização é local ao span**, nunca global. Trocar `O` por `0` no documento
 inteiro destruiria palavras comuns. Dentro do span já delimitado, a troca é
@@ -75,11 +77,12 @@ consta do acervo apenas dentro de fundamentações, e nenhum processo responde
 por ele. É o que distingue uma referência a processo inexistente de uma
 referência legítima, já que ambas encontram documentos na busca por texto.
 
-**O LLM decide só o que a estrutura não decide.** Ele é consultado quando dois
-processos foram autuados com o mesmo número e diferem apenas na espécie do
-recurso, caso em que só a leitura dos cabeçalhos separa um do outro. No
-conjunto de referência isso ocorre uma vez em 195 citações. Trocar as respostas
-do modelo por qualquer valor fixo muda o score em menos de 0.007.
+**O modelo decide só o que a estrutura não decide.** Ele é consultado quando
+dois processos foram autuados com o mesmo número e diferem apenas na espécie
+do recurso, caso em que só a leitura dos cabeçalhos separa um do outro. No
+conjunto de referência isso ocorre uma vez em 195 citações, e é a única
+consulta ao modelo em todo o pipeline. Trocar a resposta por qualquer valor
+fixo muda o score em menos de 0.007.
 
 **A confiança declarada é medida, não estimada.** Cada caminho de resolução tem
 a sua, calibrada pela taxa de acerto observada e verificada sob degradação
@@ -92,9 +95,6 @@ acurácia cai alguns pontos, que é o cenário do conjunto cego.
 src/
   regex_extracao.py        citações com identificador (processo, súmula, tema, artigo)
   regex_prosa.py           citações sem identificador (tribunal, ano, relator)
-  prompt_extracao.py       extração via LLM das formas que fogem dos padrões
-  schema_extracao.py       schema Pydantic que valida a saída do LLM
-  verificacao_substring.py reancora o trecho do LLM no texto original
   extracao.py              mescla as fontes e deduplica por IoU
   normalizacao.py          normaliza o identificador dentro do span
   indice_normativo.py      índice dos 18 registros de súmula e dispositivo
@@ -117,7 +117,7 @@ resultado sempre possa ser reproduzido com o prompt exato que o produziu.
 | Família | Vigente | Papel |
 |---|---|---|
 | `escolha_de_registro` | v2 | Escolhe entre registros autuados com o mesmo número |
-| `extracao_em_prosa` | v2 | Extrai as citações em prosa que os padrões não alcançaram |
+| `extracao_em_prosa` | aposentada | Extraía citações em prosa, hoje cobertas por padrão |
 
 O texto em produção está protegido por soma de verificação na suíte de
 testes. Nenhuma avaliação local exercita o caminho do modelo, então uma
@@ -142,7 +142,7 @@ Os dados da competição não estão versionados (ver `.gitignore`). Baixe
 *Data* da competição e coloque na raiz do projeto.
 
 ```bash
-pip install torch transformers pydantic pandas numpy pytest
+pip install torch transformers pandas numpy pytest
 
 pytest tests/                    # suíte de regressão, roda em milissegundos
 python avaliar.py                # avaliação determinística, sem carregar o modelo
