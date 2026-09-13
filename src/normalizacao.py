@@ -23,16 +23,24 @@ MAPA_OCR = {
 
 _CHARS_NUMERICOS = "0-9OolIGgSs"
 
-# Um bloco numérico admite ponto, traço e espaço entre dois caracteres,
-# nunca nas bordas: o espaço aparece como separador de milhar ruidoso
-# ("1 307 026"), e sem aceitá-lo o número se fragmentaria em pedaços curtos
-# demais para identificar coisa alguma. O hífen cercado de espaços é
-# exceção — separa a UF do número ("21737l8 - SP") e não faz parte dele.
+# Um bloco numérico admite ponto, traço e espaço em branco entre dois
+# caracteres, nunca nas bordas: a digitalização quebra o número em qualquer
+# ponto, e o que separa dois pedaços pode ser um espaço ("1 307 026"), uma
+# quebra de linha ("...5.24.\n0091") ou uma sequência de pontuação
+# ("33.-\n474"). Sem aceitá-los o número se fragmentaria em pedaços curtos
+# demais para identificar coisa alguma — e pedaços curtos casam com
+# documentos que não têm relação com a citação.
 _UNIDADE_NUMERICA = rf"[{_CHARS_NUMERICOS}]"
-_COLA = rf"(?:{_UNIDADE_NUMERICA}|\.|-(?!\s)(?<!\s-)| )"
+_SEPARADOR_INTERNO = r"[.\-]|[ \n\r\t\xa0]"
+_COLA = rf"(?:{_UNIDADE_NUMERICA}|{_SEPARADOR_INTERNO})"
 _BLOCO_CANDIDATO = re.compile(
     rf"{_UNIDADE_NUMERICA}(?:{_COLA}*{_UNIDADE_NUMERICA})?"
 )
+
+# Pontuação e espaço que sobram nas bordas depois de descartada uma letra
+# vizinha: em "21737l8 - SP" a sigla da UF sai como letra isolada e deixa
+# atrás de si o hífen que a separava do número.
+_BORDAS_DESCARTAVEIS = ".- \n\r\t\xa0"
 
 
 def _eh_letra_isolada(bloco: str, i: int) -> bool:
@@ -53,7 +61,7 @@ def _aparar_letras_isoladas(bloco: str) -> str:
         inicio += 1
     while fim > inicio and _eh_letra_isolada(bloco, fim - 1):
         fim -= 1
-    return bloco[inicio:fim]
+    return bloco[inicio:fim].strip(_BORDAS_DESCARTAVEIS)
 
 
 def _traduzir_letras(bloco: str) -> str:
@@ -98,8 +106,9 @@ def _normalizar_bloco(bloco: str) -> str:
     if len(so_digitos) == _DIGITOS_CNJ:
         return _formatar_cnj(so_digitos)
     if any(c in ".-" for c in bloco):
-        # a pontuação original já estrutura o número; o espaço é ruído
-        return traduzido.replace(" ", "").replace("\xa0", "")
+        # a pontuação original já estrutura o número; o espaço em branco
+        # que a digitalização deixou entre os pedaços é ruído
+        return re.sub(r"[ \n\r\t\xa0]", "", traduzido)
     return _reagrupar(so_digitos)
 
 

@@ -31,6 +31,19 @@ class Candidato:
 # acervo. Acima deste limite a citação é ambígua por definição.
 _MAX_CANDIDATOS_PARA_CLASSIFICAR = 8
 
+# Um acórdão traz o próprio número no cabeçalho, junto da data, do órgão
+# julgador e das partes; quem apenas o cita traz o número no corpo do voto,
+# milhares de caracteres adiante. Medido sobre o acervo, o identificador do
+# processo dono aparece antes deste ponto em 67 dos 77 casos, contra 1 dos
+# 24 dos documentos que só o mencionam.
+_LIMITE_CABECALHO = 500
+
+# O acervo guarda o mesmo acórdão mais de uma vez, com diferenças de
+# digitalização que não mudam o conteúdo. Nesses pares o identificador cai
+# na mesma posição dos dois textos, e nenhum critério textual os separa: a
+# escolha precisa apenas ser estável, e recai sobre o menor id_canonico.
+_TOLERANCIA_POSICAO_DUPLICATA = 2
+
 
 def _regex_digitos_com_pontuacao_opcional(identificador: str) -> re.Pattern:
     """Padrão que casa a sequência de dígitos do identificador tolerando
@@ -96,6 +109,7 @@ CONFIANCA_POR_CAMINHO = {
     "normativo": 0.98,        # súmula ou artigo casado no índice normativo
     "sem_identificador": 0.98,  # citação em prosa, sem número a resolver
     "registro_unico": 0.95,   # um só registro do acervo contém o identificador
+    "cabecalho": 0.93,        # um só registro traz o identificador no cabeçalho
     "sem_candidato": 0.90,    # nenhum registro contém o identificador
     "desempate": 0.70,        # vários candidatos, resolvidos por posição
     "ambiguo": 0.30,          # identificador presente em documentos demais
@@ -113,14 +127,51 @@ class Resolucao:
         return iter((self.classe, self.id_canonico))
 
 
-def decidir_classe(candidatos_donos: list[Candidato]) -> tuple[str, int | None]:
-    """Classe da citação a partir da quantidade de registros que a
-    resolvem: um é `real`, nenhum é `inventada`, vários é `incompleta`."""
-    if len(candidatos_donos) == 1:
-        return "real", candidatos_donos[0].id_canonico
-    if len(candidatos_donos) == 0:
-        return "inventada", None
-    return "incompleta", None
+def _ordem_de_preferencia(candidato: Candidato) -> tuple[int, int]:
+    """Chave de ordenação dos candidatos: primeiro quem traz o
+    identificador mais perto do início, e o id_canonico torna a escolha
+    estável entre registros equivalentes."""
+    return (candidato.posicao, candidato.id_canonico)
+
+
+def _um_por_registro(candidatos: list[Candidato]) -> list[Candidato]:
+    """Um candidato por id_canonico, o de identificador mais adiantado."""
+    por_registro: dict[int, Candidato] = {}
+    for candidato in candidatos:
+        atual = por_registro.get(candidato.id_canonico)
+        if atual is None or _ordem_de_preferencia(candidato) < _ordem_de_preferencia(atual):
+            por_registro[candidato.id_canonico] = candidato
+    return sorted(por_registro.values(), key=_ordem_de_preferencia)
+
+
+def _desempatar_por_posicao(candidatos: list[Candidato]) -> "Resolucao | None":
+    """Resolve a disputa entre vários registros quando a posição do
+    identificador basta, e devolve None quando ela não decide.
+
+    São dois os casos em que decide. Se apenas um registro traz o número no
+    cabeçalho, é ele o processo citado, e os demais apenas o mencionam. Se
+    vários o trazem na mesma posição, são cópias do mesmo acórdão no acervo
+    e qualquer uma responde pela citação.
+    """
+    ordenados = _um_por_registro(candidatos)
+    primeiro = ordenados[0]
+
+    duplicatas = [
+        c
+        for c in ordenados
+        if abs(c.posicao - primeiro.posicao) <= _TOLERANCIA_POSICAO_DUPLICATA
+    ]
+    if len(duplicatas) > 1:
+        return Resolucao(
+            "real", primeiro.id_canonico, CONFIANCA_POR_CAMINHO["registro_unico"]
+        )
+
+    no_cabecalho = [c for c in ordenados if c.posicao < _LIMITE_CABECALHO]
+    if len(no_cabecalho) == 1:
+        return Resolucao(
+            "real", no_cabecalho[0].id_canonico, CONFIANCA_POR_CAMINHO["cabecalho"]
+        )
+    return None
 
 
 def resolver_citacoes(
@@ -195,17 +246,7 @@ def resolver_citacoes(
             )
             continue
 
-        indices_perguntas: list[int] = []
-        candidatos_acervo: list[Candidato] = []
-        for achado in acervo_do_candidato:
-            chave = (achado.documento_id, achado.ocorrencia[0])
-            if chave not in indice_por_trecho:
-                indice_por_trecho[chave] = len(perguntas)
-                perguntas.append((achado.texto, *achado.ocorrencia))
-            indices_perguntas.append(indice_por_trecho[chave])
-            candidatos_acervo.append(achado)
-
-        if not indices_perguntas:
+        if not acervo_do_candidato:
             # Sem candidatos classificáveis: o identificador ambíguo indica
             # que o número existe no acervo mas não identifica um registro.
             resultados[posicao] = (
@@ -213,8 +254,23 @@ def resolver_citacoes(
                 if ambiguo_demais
                 else Resolucao("inventada", None, CONFIANCA_POR_CAMINHO["sem_candidato"])
             )
-        else:
-            pendentes.append((posicao, indices_perguntas, candidatos_acervo))
+            continue
+
+        resolucao = _desempatar_por_posicao(acervo_do_candidato)
+        if resolucao is not None:
+            resultados[posicao] = resolucao
+            continue
+
+        indices_perguntas: list[int] = []
+        candidatos_acervo: list[Candidato] = []
+        for achado in _um_por_registro(acervo_do_candidato):
+            chave = (achado.documento_id, achado.ocorrencia[0])
+            if chave not in indice_por_trecho:
+                indice_por_trecho[chave] = len(perguntas)
+                perguntas.append((achado.texto, *achado.ocorrencia))
+            indices_perguntas.append(indice_por_trecho[chave])
+            candidatos_acervo.append(achado)
+        pendentes.append((posicao, indices_perguntas, candidatos_acervo))
 
     respostas = classificar_dono_ou_citacao_lote(qwen, perguntas)
 
@@ -224,18 +280,14 @@ def resolver_citacoes(
             for indice_pergunta, acervo in zip(indices_perguntas, candidatos_acervo)
             if respostas[indice_pergunta]
         ]
-        # A posição do identificador desempata: o processo traz o próprio
-        # número na abertura, enquanto quem o cita o traz no corpo.
+        # Quando o modelo recusa todos, o mais próximo do cabeçalho é o dono
+        # mais provável — é onde o processo declara o próprio número.
         if not donos:
-            donos = [min(candidatos_acervo, key=lambda c: c.posicao)]
+            donos = [min(candidatos_acervo, key=_ordem_de_preferencia)]
 
-        unicos = {c.id_canonico: c for c in donos}
-        classe, id_canonico = decidir_classe(list(unicos.values()))
-        if classe == "incompleta":
-            vencedor = min(unicos.values(), key=lambda c: c.posicao)
-            classe, id_canonico = "real", vencedor.id_canonico
+        vencedor = min(donos, key=_ordem_de_preferencia)
         resultados[posicao] = Resolucao(
-            classe, id_canonico, CONFIANCA_POR_CAMINHO["desempate"]
+            "real", vencedor.id_canonico, CONFIANCA_POR_CAMINHO["desempate"]
         )
 
     if any(r is None for r in resultados):
