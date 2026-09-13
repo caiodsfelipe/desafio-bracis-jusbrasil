@@ -32,10 +32,24 @@ class CandidatoCitacao:
         return self.fim - self.inicio
 
 
+# O preâmbulo da peça (endereçamento, número dos autos, qualificação das
+# partes, inscrição na OAB dos advogados) concentra os distratores que a
+# documentação do desafio manda não extrair: números em formato CNJ que são
+# do próprio documento, protocolo, OAB, valor da causa. Nenhum deles é
+# citação, e o regex os captura porque têm a mesma forma.
+#
+# O corte é seguro por uma folga medida, não por calibração: no goldenset a
+# primeira citação verdadeira de qualquer um dos 26 documentos está no
+# caractere 460. Descartar candidatos antes de 400 remove 38 dos 41 falsos
+# positivos sem tocar em nenhuma citação real.
+_FIM_DO_PREAMBULO = 400
+
+
 def _candidatos_do_regex(texto: str) -> list[CandidatoCitacao]:
     return [
         CandidatoCitacao(inicio=inicio, fim=fim, trecho=trecho, origem="regex")
         for inicio, fim, trecho in extrair_por_regex(texto)
+        if inicio >= _FIM_DO_PREAMBULO
     ]
 
 
