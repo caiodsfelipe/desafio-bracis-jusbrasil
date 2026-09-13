@@ -102,6 +102,7 @@ src/
   llm_qwen.py              carregamento e geração com o Qwen3-8B
   prompts/                 prompts versionados, com histórico e notas
 tests/                     suíte de regressão, sem banco e sem modelo
+notebook_kaggle.py         célula única que gera submission.csv no Kaggle
 avaliar.py                 avaliação reprodutível contra o conjunto de referência
 robustez.py                score sob perturbação dos documentos
 comparar.py                diferença de comportamento contra uma versão anterior
