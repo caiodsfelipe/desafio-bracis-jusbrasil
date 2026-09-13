@@ -71,9 +71,49 @@ _PADRAO_ARTIGO = re.compile(
     rf"\s*,?\s*d[aeo]s?\s+{_DIPLOMA}"
 )
 
+# Números que a peça traz sem citar julgado nenhum. O cadastro da parte, o
+# protocolo administrativo, a inscrição do advogado e o ato normativo do
+# Executivo têm a forma de citação, e o rótulo que os antecede é o que os
+# distingue. A lista descreve o que nunca é jurisprudência, e por isso não
+# depende de quais espécies de recurso aparecem no documento.
+_ROTULOS_NAO_JURISPRUDENCIAIS = (
+    r"CNPJ|CPF|RG|PIS|PASEP|CEP|NIT|CTPS"
+    r"|[Pp]rotocolo|OAB|[Mm]atr[íi]cula|[Ii]nscri[çc][ãa]o"
+    r"|[Pp]ortaria|[Dd]ecreto|[Rr]esolu[çc][ãa]o|[Ii]nstru[çc][ãa]o\s+[Nn]ormativa"
+    r"|[Oo]f[íi]cio|[Cc]ircular|[Nn]ota\s+[Tt][ée]cnica|[Ee]dital"
+    r"|[Cc]ontrato|[Aa]p[óo]lice|[Bb]oleto|[Nn]ota\s+[Ff]iscal"
+)
+_PADRAO_ROTULO_NAO_JURISPRUDENCIAL = re.compile(
+    rf"(?:{_ROTULOS_NAO_JURISPRUDENCIAIS})\b[\s/º°.:nN-]*$"
+)
+# O padrão de citação pode ter começado num artigo antes do rótulo, como em
+# "O Protocolo nº 2023.1475691".
+_PADRAO_ROTULO_NO_TRECHO = re.compile(
+    rf"^(?:[AaOo]s?\s+)?(?:{_ROTULOS_NAO_JURISPRUDENCIAIS})\b"
+)
+
 # Um ano precedido de preposição encerra uma citação em prosa, não um
 # identificador de processo.
 _PADRAO_PREPOSICAO_ANO = re.compile(r"\b(?:de|em)\s+\d{4}$", re.IGNORECASE)
+
+
+# Alcance do rótulo antes do número: cabe "Protocolo nº" e "OAB/MG", não uma
+# frase inteira.
+_ALCANCE_DO_ROTULO = 24
+
+
+def _e_numero_administrativo(texto: str, inicio: int, trecho: str) -> bool:
+    """O número é cadastral ou administrativo, e não identifica julgado.
+
+    O rótulo pode estar dentro do trecho, quando o padrão o tomou por nome
+    de recurso, ou imediatamente antes dele, quando o número foi capturado
+    sozinho.
+    """
+    antes = texto[max(0, inicio - _ALCANCE_DO_ROTULO) : inicio]
+    return bool(
+        _PADRAO_ROTULO_NAO_JURISPRUDENCIAL.search(antes)
+        or _PADRAO_ROTULO_NO_TRECHO.search(trecho)
+    )
 
 
 def extrair_candidatos(texto: str) -> list[tuple[int, int, str]]:
@@ -82,7 +122,10 @@ def extrair_candidatos(texto: str) -> list[tuple[int, int, str]]:
     candidatos = []
     for padrao in (_PADRAO_CITACAO, _PADRAO_SUMULA, _PADRAO_ARTIGO, _PADRAO_TEMA):
         for m in padrao.finditer(texto):
-            if _PADRAO_PREPOSICAO_ANO.search(m.group()):
+            trecho = m.group()
+            if _PADRAO_PREPOSICAO_ANO.search(trecho):
                 continue
-            candidatos.append((m.start(), m.end(), m.group()))
+            if _e_numero_administrativo(texto, m.start(), trecho):
+                continue
+            candidatos.append((m.start(), m.end(), trecho))
     return candidatos

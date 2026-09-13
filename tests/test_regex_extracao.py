@@ -63,3 +63,34 @@ def test_digito_solto_nao_e_citacao(texto):
     """Uma letra que a digitalização deixou parecida com dígito não forma
     identificador sozinha."""
     assert trechos(texto) == []
+
+
+@pytest.mark.parametrize(
+    "texto",
+    [
+        "CNPJ 12.345.678/0001-90",
+        "o CPF 123.456.789-00",
+        "O Protocolo nº 2023.1475691 foi registrado",
+        "Advogado inscrito na OAB/MG 241945 subscreve",
+        "na Portaria 1.234/2020",
+        "o Decreto 9.876/2019",
+        "matrícula nº 12345",
+        "A condenação foi fixada em R$ 168.772,18.",
+    ],
+)
+def test_numero_administrativo_nao_e_citacao(texto):
+    """Cadastro, protocolo, inscrição e ato do Executivo têm a forma de
+    citação; o rótulo que os antecede é o que os distingue."""
+    assert trechos(texto) == []
+
+
+@pytest.mark.parametrize(
+    "texto",
+    [
+        "A Reclamação nº 66.516/RO",
+        "O Recurso Especial nº 1.377.019/SP",
+        "O Agravo Interno na Suspensão de Liminar nº 2.883/MA",
+    ],
+)
+def test_artigo_antes_do_recurso_nao_bloqueia_a_citacao(texto):
+    assert texto in trechos(texto)

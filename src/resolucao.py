@@ -66,6 +66,20 @@ def _primeira_ocorrencia(texto: str, identificador: str) -> tuple[int, int] | No
     return (m.start(), m.end()) if m else None
 
 
+def contar_candidatos(con: sqlite3.Connection, identificador: str) -> int:
+    """Quantos documentos do acervo contêm o identificador.
+
+    A contagem precede a leitura porque um número curto casa com centenas
+    de documentos, e carregar o inteiro teor de todos eles para descartá-los
+    em seguida custa dezenas de megabytes por citação.
+    """
+    (total,) = con.execute(
+        "SELECT count(*) FROM documentos_fts WHERE documentos_fts MATCH ?",
+        (f'"{identificador}"',),
+    ).fetchone()
+    return total
+
+
 def buscar_candidatos(con: sqlite3.Connection, identificador: str) -> list[Candidato]:
     """Documentos do acervo que contêm o identificador, buscados por frase
     no índice FTS5.
@@ -207,7 +221,9 @@ def resolver_citacoes(
 
     resultados: list[Resolucao | None] = [None] * len(candidatos)
     disputas: list[tuple[str, list[str]]] = []
-    cache_busca: dict[str, list[Candidato]] = {}
+    # Um identificador que casa com documentos demais é registrado como None,
+    # e o acervo não chega a ser lido para ele.
+    cache_busca: dict[str, list[Candidato] | None] = {}
     pendentes: list[tuple[int, list[Candidato]]] = []
 
     for posicao, candidato in enumerate(candidatos):
@@ -232,8 +248,11 @@ def resolver_citacoes(
         ambiguo_demais = False
         for identificador in identificadores:
             if identificador not in cache_busca:
-                cache_busca[identificador] = buscar_candidatos(con, identificador)
-            if len(cache_busca[identificador]) > _MAX_CANDIDATOS_PARA_CLASSIFICAR:
+                if contar_candidatos(con, identificador) > _MAX_CANDIDATOS_PARA_CLASSIFICAR:
+                    cache_busca[identificador] = None
+                else:
+                    cache_busca[identificador] = buscar_candidatos(con, identificador)
+            if cache_busca[identificador] is None:
                 ambiguo_demais = True
                 continue
             acervo_do_candidato.extend(
