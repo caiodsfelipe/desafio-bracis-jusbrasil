@@ -103,6 +103,17 @@ def buscar_candidatos(con: sqlite3.Connection, identificador: str) -> list[Candi
     return candidatos
 
 
+# Acima disto, o identificador é ambíguo demais para valer uma pergunta ao
+# LLM: nenhum número de processo real casa com dezenas de documentos. Quem
+# faz isso é número curto ("255", de um "Memorial nº 255/2021" que o regex
+# capturou por engano), que casa em qualquer lugar do acervo. O resultado
+# já é conhecido sem perguntar — candidatos demais, sem critério de
+# desempate, ou seja `incompleta` — e perguntar custaria uma inferência por
+# candidato (medido: 115 dos 120 prompts de um documento vinham de um único
+# identificador degenerado).
+_MAX_CANDIDATOS_PARA_CLASSIFICAR = 8
+
+
 def decidir_classe(candidatos_donos: list[Candidato]) -> tuple[str, int | None]:
     """Contagem de candidatos -> classe (ver contrato do desafio):
     exatamente 1 -> real (com id_canonico); 0 -> inventada;
@@ -152,9 +163,9 @@ def resolver_citacoes(
     indice_por_trecho: dict[tuple[str, int], int] = {}
     # identificador -> resultado do FTS, para não repetir a consulta
     cache_busca: dict[str, list[Candidato]] = {}
-    # para cada candidato, os índices de `perguntas` que lhe pertencem e o
-    # Candidato do acervo correspondente a cada pergunta
-    pendentes: list[tuple[int, list[int], list[Candidato]]] = []
+    # por candidato: posição, índices em `perguntas`, o Candidato do acervo
+    # de cada pergunta, e se algum identificador foi ambíguo demais
+    pendentes: list[tuple[int, list[int], list[Candidato], bool]] = []
 
     for posicao, candidato in enumerate(candidatos):
         if eh_citacao_normativa(candidato.trecho):
@@ -174,9 +185,13 @@ def resolver_citacoes(
 
         indices_perguntas: list[int] = []
         candidatos_acervo: list[Candidato] = []
+        ambiguo_demais = False
         for identificador in identificadores:
             if identificador not in cache_busca:
                 cache_busca[identificador] = buscar_candidatos(con, identificador)
+            if len(cache_busca[identificador]) > _MAX_CANDIDATOS_PARA_CLASSIFICAR:
+                ambiguo_demais = True
+                continue
             for achado in cache_busca[identificador]:
                 # súmulas/dispositivos não têm "dono de processo" — só
                 # acórdãos passam pela classificação
@@ -190,20 +205,30 @@ def resolver_citacoes(
                 candidatos_acervo.append(achado)
 
         if not indices_perguntas:
-            resultados[posicao] = ("inventada", None)
+            # sem nenhum candidato classificável: `incompleta` se algum
+            # identificador era ambíguo demais (candidatos existem, mas em
+            # excesso e sem desempate), `inventada` se o acervo não tem
+            # nada com aquele número
+            resultados[posicao] = ("incompleta", None) if ambiguo_demais else ("inventada", None)
         else:
-            pendentes.append((posicao, indices_perguntas, candidatos_acervo))
+            pendentes.append((posicao, indices_perguntas, candidatos_acervo, ambiguo_demais))
 
     respostas = classificar_dono_ou_citacao_lote(qwen, perguntas)
 
-    for posicao, indices_perguntas, candidatos_acervo in pendentes:
+    for posicao, indices_perguntas, candidatos_acervo, ambiguo_demais in pendentes:
         donos = [
             acervo
             for indice_pergunta, acervo in zip(indices_perguntas, candidatos_acervo)
             if respostas[indice_pergunta]
         ]
         unicos = {c.id_canonico: c for c in donos}
-        resultados[posicao] = decidir_classe(list(unicos.values()))
+        classe, id_canonico = decidir_classe(list(unicos.values()))
+        # um identificador do span era ambíguo demais para classificar: não
+        # dá para afirmar `inventada` (o acervo tinha candidatos, só não
+        # havia como desempatar)
+        if classe == "inventada" and ambiguo_demais:
+            classe, id_canonico = "incompleta", None
+        resultados[posicao] = (classe, id_canonico)
 
     if any(r is None for r in resultados):
         raise AssertionError("candidato sem resultado — todo caminho deve decidir uma classe")

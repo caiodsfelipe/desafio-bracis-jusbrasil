@@ -98,18 +98,36 @@ def _reagrupar(digitos: str) -> str:
     return ".".join(reversed(partes))
 
 
+_DIGITOS_CNJ = 20
+
+
+def _formatar_cnj(digitos: str) -> str:
+    """'06003164920206160182' -> '0600316-49.2020.6.16.0182'.
+
+    O CNJ tem estrutura fixa (sequencial 7, dígito verificador 2, ano 4,
+    segmento 1, tribunal 2, origem 4), então com 20 dígitos a pontuação é
+    reconstruível sem ambiguidade. O nível 2 entrega esses números com
+    pontuação parcial ou nenhuma ("0600316-4920206160182"), e o acervo os
+    grava pontuados — sem reconstruir, a busca por frase no FTS não casa."""
+    return (
+        f"{digitos[:7]}-{digitos[7:9]}.{digitos[9:13]}"
+        f".{digitos[13]}.{digitos[14:16]}.{digitos[16:20]}"
+    )
+
+
 def _normalizar_bloco(bloco: str) -> str:
     bloco = _aparar_letras_isoladas(bloco)
-    tem_pontuacao_propria = any(c in ".-" for c in bloco)
     traduzido = _traduzir_letras(bloco)
-    if tem_pontuacao_propria:
-        # espaço aqui é sempre ruído de digitação (nunca separador de
-        # milhar intencional quando já há ponto/traço estruturando o
-        # número) — remove, preserva o resto da pontuação como está
+    so_digitos = re.sub(r"\D", "", traduzido)
+
+    if len(so_digitos) == _DIGITOS_CNJ:
+        return _formatar_cnj(so_digitos)
+    if any(c in ".-" for c in bloco):
+        # já vem estruturado por ponto/traço: espaço aqui é ruído de
+        # digitação (nunca separador de milhar), remove e preserva o resto
         return traduzido.replace(" ", "").replace("\xa0", "")
     # sem pontuação própria: espaço solto é separador de milhar ruidoso
-    # (ex. "1 307 026") — remove tudo e reagrupa do zero
-    so_digitos = re.sub(r"\D", "", traduzido)
+    # (ex. "1 307 026") — remove tudo e reagrupa de 3 em 3
     return _reagrupar(so_digitos)
 
 

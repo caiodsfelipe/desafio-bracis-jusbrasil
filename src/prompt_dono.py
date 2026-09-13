@@ -27,6 +27,18 @@ relator Ministro Fulano, Segunda Turma, julgado em .../.../...)".
 - O nome do relator aparece em minúsculas, seguido de "Turma", "julgado em" \
 ou "DJe" — formato de referência bibliográfica de precedente, não de \
 identificação do próprio caso.
+- O número aparece numa LISTA de processos correlatos, itemizada com \
+travessões ou marcadores e ligada por expressões como "envolvendo os IPMs \
+nº ...", "(declinado)", "(prevento)", "em apenso", "conexo a". Uma lista de \
+vários números seguidos é enumeração de outros feitos, não a identificação \
+deste documento — mesmo que traga o nome do recurso por extenso antes do \
+número.
+
+ATENÇÃO: o nome do recurso escrito antes do número ("Recurso em Sentido \
+Estrito nº ...", "Apelação nº ...") NÃO é sinal de DONO por si só — aparece \
+igualmente em citações. O que caracteriza o DONO é o número vir acompanhado \
+da identificação formal do julgamento: RELATOR/RELATORA, as partes \
+qualificadas, o órgão julgador e a data da sessão.
 
 Responda apenas com uma das duas palavras, sem explicação: DONO ou CITACAO.
 Se o trecho não tiver nenhum dos sinais acima, responda CITACAO (na dúvida, \

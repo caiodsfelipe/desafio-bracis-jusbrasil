@@ -20,29 +20,35 @@ Regras obrigatórias:
 1. Copie cada citação EXATAMENTE como aparece no texto, caractere por \
 caractere — incluindo quebras de linha, abreviações e eventuais erros de \
 digitação. Não corrija, não complete, não normalize nada.
+1b. Copie APENAS a citação em si, não a frase inteira em que ela aparece. \
+Comece na designação do julgado (a sigla, o nome do recurso, ou "julgado do", \
+"precedente do", "acórdão do") e termine no último elemento que identifica o \
+julgado (o número com a UF, ou o nome do relator). Não inclua o que vem \
+antes ("Invoca-se, ainda,", "Como já se reconheceu no") nem o que vem depois \
+(", no ponto em que afasta a exigência combatida").
+   Errado: "Invoca-se, ainda, a Reclamação nº 66.516/RO, no ponto em que afasta a exigência combatida."
+   Certo:  "Reclamação nº 66.516/RO"
+   Errado: "Como já se reconheceu no julgado do STM proferido em 2023 pela relatoria de CARLOS AUGUSTO AMARAL OLIVEIRA, a distinção pretendida não se sustenta."
+   Certo:  "julgado do STM proferido em 2023 pela relatoria de CARLOS AUGUSTO AMARAL OLIVEIRA"
 2. Não invente citações. Se não tiver certeza de que um trecho é uma \
 citação, não o inclua.
-3. Inclua também citações sem número de processo, quando o texto se refere \
-a um julgado por descrição — por exemplo "julgado do STF proferido em 2024 \
-pela relatoria de Dias Toffoli". Nesses casos preencha tribunal, ano e \
-relator com o que o texto informar.
-4. Não inclua números que não são citação: protocolo, inscrição na OAB, \
-número de folhas (fls.), valor da causa.
-5. O número do processo da própria peça (o que aparece no cabeçalho, \
-identificando os autos deste documento) NÃO é citação: inclua-o na lista \
-com "e_numero_do_proprio_documento": true, para que seja descartado.
-6. Responda apenas com uma lista JSON, sem texto antes ou depois, onde cada \
+3. Liste SOMENTE as citações SEM número de processo — aquelas em que o \
+julgado é descrito por tribunal, ano e relator, como "julgado do STF \
+proferido em 2024 pela relatoria de Dias Toffoli" ou "precedente do STM de \
+2023, da relatoria de Marco Antonio". Citações que trazem número de \
+processo, súmula ou artigo de lei já são tratadas por outro componente: \
+NÃO as inclua.
+4. Responda apenas com uma lista JSON, sem texto antes ou depois, onde cada \
 item tem os campos:
    - "trecho": o texto copiado literalmente (obrigatório)
    - "tribunal": sigla do tribunal, ou null
    - "ano": ano do julgado como número, ou null
    - "relator": nome do relator, ou null
-   - "e_numero_do_proprio_documento": true ou false
-7. Se não houver nenhuma citação no texto, responda: []
+5. Se não houver nenhuma citação desse tipo no texto, responda: []
 
 Exemplo de resposta:
-[{"trecho": "REsp nº 1.741.784/PR", "tribunal": "STJ", "ano": null, "relator": null, "e_numero_do_proprio_documento": false},
- {"trecho": "julgado do STF proferido em 2024 pela relatoria de Dias Toffoli", "tribunal": "STF", "ano": 2024, "relator": "Dias Toffoli", "e_numero_do_proprio_documento": false}]
+[{"trecho": "julgado do STF proferido em 2024 pela relatoria de Dias Toffoli", "tribunal": "STF", "ano": 2024, "relator": "Dias Toffoli"},
+ {"trecho": "precedente do STM de 2023, da relatoria de Marco Antonio", "tribunal": "STM", "ano": 2023, "relator": "Marco Antonio"}]
 """
 
 PROMPT_USUARIO_TEMPLATE = """Texto do documento:
@@ -62,6 +68,9 @@ def extrair_citacoes(qwen, texto: str) -> list:
     resposta = qwen.gerar(
         PROMPT_SISTEMA,
         PROMPT_USUARIO_TEMPLATE.format(texto=texto),
-        max_novos_tokens=2048,  # documento inteiro pode ter dezenas de citações
+        # só citações em prosa (as com número vêm do regex) — são poucas e
+        # curtas por documento, e o parser recupera itens completos se
+        # mesmo assim a resposta truncar
+        max_novos_tokens=768,
     )
     return parsear_resposta(resposta.texto)

@@ -61,7 +61,12 @@ def parsear_resposta(texto_resposta: str) -> list[CitacaoExtraida]:
     try:
         dados = json.loads(texto)
     except json.JSONDecodeError:
-        return []
+        # Resposta truncada (o orçamento de tokens acabou no meio do último
+        # item) é o caso comum, não exceção: um documento com muitas
+        # citações estoura qualquer limite razoável. Descartar a resposta
+        # inteira perderia todos os itens já completos, então recuperamos
+        # objeto a objeto.
+        dados = _objetos_completos(texto)
     if not isinstance(dados, list):
         return []
 
@@ -72,3 +77,42 @@ def parsear_resposta(texto_resposta: str) -> list[CitacaoExtraida]:
         except ValidationError:
             continue
     return citacoes
+
+
+def _objetos_completos(texto: str) -> list[dict]:
+    """Extrai os objetos JSON de nível 1 que estão completos, ignorando um
+    eventual objeto truncado no fim. Rastreia aspas e escapes para não se
+    confundir com chaves dentro de strings (o trecho citado pode conter
+    '{' ou '}')."""
+    import json
+
+    objetos = []
+    profundidade = 0
+    inicio = None
+    dentro_de_string = False
+    escapado = False
+
+    for posicao, caractere in enumerate(texto):
+        if dentro_de_string:
+            if escapado:
+                escapado = False
+            elif caractere == "\\":
+                escapado = True
+            elif caractere == '"':
+                dentro_de_string = False
+            continue
+        if caractere == '"':
+            dentro_de_string = True
+        elif caractere == "{":
+            if profundidade == 0:
+                inicio = posicao
+            profundidade += 1
+        elif caractere == "}":
+            profundidade -= 1
+            if profundidade == 0 and inicio is not None:
+                try:
+                    objetos.append(json.loads(texto[inicio : posicao + 1]))
+                except json.JSONDecodeError:
+                    pass
+                inicio = None
+    return objetos
