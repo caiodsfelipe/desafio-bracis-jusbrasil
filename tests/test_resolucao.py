@@ -5,11 +5,15 @@ A resolução recebe candidatos já buscados no acervo, e são as regras sobre
 esses candidatos que os testes verificam.
 """
 
+import pytest
+
 from resolucao import (
     _LIMITE_CABECALHO,
+    CONFIANCA_POR_CAMINHO,
     Candidato,
     _desempatar_por_posicao,
     _um_por_registro,
+    resolvido_por,
 )
 
 
@@ -66,3 +70,29 @@ def test_um_por_registro_mantem_a_ocorrencia_mais_adiantada():
         (7, 120),
         (9, 400),
     ]
+
+
+@pytest.mark.parametrize(
+    "caminho, minimo",
+    [
+        ("normativo", 0.98),
+        ("sem_identificador", 0.98),
+        ("registro_unico", 0.97),
+        ("sem_candidato", 0.96),
+        ("cabecalho", 0.95),
+    ],
+)
+def test_confianca_dos_caminhos_deterministicos(caminho, minimo):
+    """O bônus de calibração mede a distância entre a confiança declarada e
+    o acerto efetivo. Estes caminhos acertam tudo no conjunto de referência,
+    e rebaixar a confiança abaixo do valor medido custa bônus."""
+    assert CONFIANCA_POR_CAMINHO[caminho] >= minimo
+
+
+def test_resolucao_carrega_o_caminho_que_a_produziu():
+    """O diagnóstico por caminho não deve depender do valor da confiança:
+    dois caminhos podem declarar o mesmo valor quando acertam igual."""
+    resolucao = resolvido_por("cabecalho", "real", 42)
+    assert resolucao.caminho == "cabecalho"
+    assert resolucao.confianca == CONFIANCA_POR_CAMINHO["cabecalho"]
+    assert tuple(resolucao) == ("real", 42)

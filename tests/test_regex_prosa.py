@@ -62,3 +62,29 @@ def test_texto_sem_citacao_nao_produz_candidato():
 def test_participio_corrompido_nao_impede_a_citacao():
     trecho = "acórdão do STJ julgadc em 2021 sob relatoria de Assusete Magalhães"
     assert trecho in trechos(trecho)
+
+
+@pytest.mark.parametrize(
+    "texto, esperado",
+    [
+        (
+            "caminham os reiterados\nprecedentes do Superior Tribunal de Justiça.",
+            "reiterados\nprecedentes do Superior Tribunal de Justiça",
+        ),
+        (
+            "precedente da Corte Especial do STJ de 2020",
+            "precedente da Corte Especial do STJ de 2020",
+        ),
+    ],
+)
+def test_borda_da_citacao(texto, esperado):
+    """O adjetivo que qualifica o julgado faz parte da citação, e o órgão
+    fracionário não encerra o span antes do tribunal."""
+    assert esperado in trechos(texto)
+
+
+def test_termo_jurisprudencial_nao_engole_a_sumula_seguinte():
+    """"Corrobora esse entendimento a Súmula 935 do STF" traz uma citação de
+    súmula, que o padrão estrutural delimita; o termo em prosa não deve
+    absorvê-la."""
+    assert trechos("Corrobora esse entendimento a Súmula 935\ndo STF, que") == []
