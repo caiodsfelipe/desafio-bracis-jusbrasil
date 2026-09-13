@@ -100,26 +100,42 @@ def _deduplicar(candidatos: list[CandidatoCitacao], iou_min: float = 0.5) -> lis
     Ao manter o span mais longo, herda os metadados do candidato do LLM
     sobreposto, se houver: o regex não extrai tribunal/ano/relator, e essa
     informação seria perdida se o span do regex simplesmente vencesse."""
+    # O candidato do regex vem primeiro quando há disputa: ele delimita a
+    # citação com precisão, enquanto o LLM tende a arrastar a frase em
+    # volta ("julgado hostilizado desconsiderou por completo o art. 818 da
+    # CLT" em vez de "art. 818 da CLT"). Entre spans do mesmo tipo, o maior
+    # ganha; empates resolvem pela posição, para o resultado ser estável
+    # (reprodutibilidade exigida pelas regras do desafio).
     ordenados = sorted(
-        candidatos, key=lambda c: (-c.tamanho, c.origem != "regex", c.inicio)
+        candidatos, key=lambda c: (c.origem != "regex", -c.tamanho, c.inicio)
     )
     mantidos: list[CandidatoCitacao] = []
     for candidato in ordenados:
-        sobreposto = next(
-            (
-                m
-                for m in mantidos
-                if _iou((candidato.inicio, candidato.fim), (m.inicio, m.fim)) >= iou_min
-            ),
+        conflitante = next(
+            (m for m in mantidos if _conflita((candidato.inicio, candidato.fim), (m.inicio, m.fim), iou_min)),
             None,
         )
-        if sobreposto is None:
+        if conflitante is None:
             mantidos.append(candidato)
-        elif sobreposto.tribunal is None and candidato.tribunal is not None:
-            sobreposto.tribunal = candidato.tribunal
-            sobreposto.ano = candidato.ano
-            sobreposto.relator = candidato.relator
+        elif conflitante.tribunal is None and candidato.tribunal is not None:
+            conflitante.tribunal = candidato.tribunal
+            conflitante.ano = candidato.ano
+            conflitante.relator = candidato.relator
     return sorted(mantidos, key=lambda c: c.inicio)
+
+
+def _conflita(a: tuple[int, int], b: tuple[int, int], iou_min: float) -> bool:
+    """Dois spans representam a mesma citação? IoU >= iou_min cobre o caso
+    de bordas parecidas, mas não o de um span muito maior que engole o
+    outro: o LLM às vezes devolve a frase inteira em volta da citação, o
+    que dá IoU baixo (0,23 num caso medido) contra o span preciso do regex
+    e criaria uma predição duplicada — falso positivo garantido, já que o
+    gabarito anota a citação uma vez só. Por isso contenção também conta."""
+    if _iou(a, b) >= iou_min:
+        return True
+    inicio_a, fim_a = a
+    inicio_b, fim_b = b
+    return (inicio_a >= inicio_b and fim_a <= fim_b) or (inicio_b >= inicio_a and fim_b <= fim_a)
 
 
 def extrair_todos(texto: str, citacoes_do_llm: list | None = None) -> list[CandidatoCitacao]:
