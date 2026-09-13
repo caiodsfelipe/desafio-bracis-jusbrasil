@@ -33,10 +33,12 @@ _MAX_CANDIDATOS_PARA_CLASSIFICAR = 8
 
 # Um acórdão traz o próprio número no cabeçalho, junto da data, do órgão
 # julgador e das partes; quem apenas o cita traz o número no corpo do voto,
-# milhares de caracteres adiante. Medido sobre o acervo, o identificador do
-# processo dono aparece antes deste ponto em 67 dos 77 casos, contra 1 dos
+# milhares de caracteres adiante. O cabeçalho varia de tamanho entre os
+# tribunais — no TST a autuação alcança mil e cem caracteres —, e o limite
+# acomoda o mais longo deles. Medido sobre o acervo, o identificador do
+# processo dono aparece antes deste ponto em 76 dos 77 casos, contra 3 dos
 # 24 dos documentos que só o mencionam.
-_LIMITE_CABECALHO = 500
+_LIMITE_CABECALHO = 2000
 
 # O acervo guarda o mesmo acórdão mais de uma vez, com diferenças de
 # digitalização que não mudam o conteúdo. Nesses pares o identificador cai
@@ -108,10 +110,11 @@ def buscar_candidatos(con: sqlite3.Connection, identificador: str) -> list[Candi
 CONFIANCA_POR_CAMINHO = {
     "normativo": 0.98,        # súmula ou artigo casado no índice normativo
     "sem_identificador": 0.98,  # citação em prosa, sem número a resolver
-    "registro_unico": 0.95,   # um só registro do acervo contém o identificador
-    "cabecalho": 0.93,        # um só registro traz o identificador no cabeçalho
-    "sem_candidato": 0.90,    # nenhum registro contém o identificador
-    "desempate": 0.70,        # vários candidatos, resolvidos por posição
+    "registro_unico": 0.97,   # um só registro do acervo contém o identificador
+    "sem_candidato": 0.96,    # nenhum registro contém o identificador
+    "cabecalho": 0.95,        # um só registro traz o identificador no cabeçalho
+    "desempate": 0.75,        # vários registros, separados pelo modelo
+    "so_mencionado": 0.60,    # o número só aparece citado, nunca como autuação
     "ambiguo": 0.30,          # identificador presente em documentos demais
 }
 
@@ -145,31 +148,40 @@ def _um_por_registro(candidatos: list[Candidato]) -> list[Candidato]:
 
 
 def _desempatar_por_posicao(candidatos: list[Candidato]) -> "Resolucao | None":
-    """Resolve a disputa entre vários registros quando a posição do
-    identificador basta, e devolve None quando ela não decide.
+    """Resolve a citação pela posição do identificador nos registros
+    encontrados, e devolve None quando a posição não decide.
 
-    São dois os casos em que decide. Se apenas um registro traz o número no
-    cabeçalho, é ele o processo citado, e os demais apenas o mencionam. Se
-    vários o trazem na mesma posição, são cópias do mesmo acórdão no acervo
-    e qualquer uma responde pela citação.
+    Um registro só responde pela citação se traz o número no próprio
+    cabeçalho. Havendo um único assim, é ele o processo citado. Havendo
+    vários que o trazem na mesma posição, são cópias do mesmo acórdão no
+    acervo e qualquer uma responde pela citação.
+
+    Quando nenhum registro traz o número no cabeçalho, o número aparece no
+    acervo apenas dentro de fundamentações — é citado, nunca autuado — e
+    não existe processo com ele: a citação é inventada. É o que distingue
+    uma referência a processo inexistente de uma referência legítima, já
+    que ambas encontram documentos na busca por texto.
     """
     ordenados = _um_por_registro(candidatos)
-    primeiro = ordenados[0]
+    no_cabecalho = [c for c in ordenados if c.posicao < _LIMITE_CABECALHO]
+    if not no_cabecalho:
+        return Resolucao("inventada", None, CONFIANCA_POR_CAMINHO["so_mencionado"])
 
+    primeiro = no_cabecalho[0]
     duplicatas = [
         c
-        for c in ordenados
+        for c in no_cabecalho
         if abs(c.posicao - primeiro.posicao) <= _TOLERANCIA_POSICAO_DUPLICATA
     ]
     if len(duplicatas) > 1:
         return Resolucao(
-            "real", primeiro.id_canonico, CONFIANCA_POR_CAMINHO["registro_unico"]
+            "real",
+            min(c.id_canonico for c in duplicatas),
+            CONFIANCA_POR_CAMINHO["registro_unico"],
         )
-
-    no_cabecalho = [c for c in ordenados if c.posicao < _LIMITE_CABECALHO]
     if len(no_cabecalho) == 1:
         return Resolucao(
-            "real", no_cabecalho[0].id_canonico, CONFIANCA_POR_CAMINHO["cabecalho"]
+            "real", primeiro.id_canonico, CONFIANCA_POR_CAMINHO["cabecalho"]
         )
     return None
 
@@ -194,14 +206,12 @@ def resolver_citacoes(
     """
     from indice_normativo import eh_citacao_normativa, resolver_normativo
     from normalizacao import normalizar_identificadores
-    from prompt_dono import classificar_dono_ou_citacao_lote
+    from prompt_dono import NENHUMA, escolher_registro_lote
 
     resultados: list[Resolucao | None] = [None] * len(candidatos)
-    perguntas: list[tuple[str, int, int]] = []
-    # Trechos idênticos do acervo compartilham a mesma pergunta.
-    indice_por_trecho: dict[tuple[str, int], int] = {}
+    disputas: list[tuple[str, list[str]]] = []
     cache_busca: dict[str, list[Candidato]] = {}
-    pendentes: list[tuple[int, list[int], list[Candidato]]] = []
+    pendentes: list[tuple[int, list[Candidato]]] = []
 
     for posicao, candidato in enumerate(candidatos):
         if eh_citacao_normativa(candidato.trecho):
@@ -261,33 +271,25 @@ def resolver_citacoes(
             resultados[posicao] = resolucao
             continue
 
-        indices_perguntas: list[int] = []
-        candidatos_acervo: list[Candidato] = []
-        for achado in _um_por_registro(acervo_do_candidato):
-            chave = (achado.documento_id, achado.ocorrencia[0])
-            if chave not in indice_por_trecho:
-                indice_por_trecho[chave] = len(perguntas)
-                perguntas.append((achado.texto, *achado.ocorrencia))
-            indices_perguntas.append(indice_por_trecho[chave])
-            candidatos_acervo.append(achado)
-        pendentes.append((posicao, indices_perguntas, candidatos_acervo))
+        # Vários processos foram autuados com o mesmo número e diferem na
+        # espécie do recurso; só a leitura dos cabeçalhos os separa.
+        em_disputa = _um_por_registro(acervo_do_candidato)
+        disputas.append((candidato.trecho, [a.texto for a in em_disputa]))
+        pendentes.append((posicao, em_disputa))
 
-    respostas = classificar_dono_ou_citacao_lote(qwen, perguntas)
+    escolhas = escolher_registro_lote(qwen, disputas)
 
-    for posicao, indices_perguntas, candidatos_acervo in pendentes:
-        donos = [
-            acervo
-            for indice_pergunta, acervo in zip(indices_perguntas, candidatos_acervo)
-            if respostas[indice_pergunta]
-        ]
-        # Quando o modelo recusa todos, o mais próximo do cabeçalho é o dono
-        # mais provável — é onde o processo declara o próprio número.
-        if not donos:
-            donos = [min(candidatos_acervo, key=_ordem_de_preferencia)]
-
-        vencedor = min(donos, key=_ordem_de_preferencia)
-        resultados[posicao] = Resolucao(
-            "real", vencedor.id_canonico, CONFIANCA_POR_CAMINHO["desempate"]
+    for (posicao, em_disputa), escolha in zip(pendentes, escolhas):
+        # O modelo recusou todas: o número consta do acervo apenas em
+        # fundamentações, e nenhum processo responde por ele.
+        resultados[posicao] = (
+            Resolucao("inventada", None, CONFIANCA_POR_CAMINHO["so_mencionado"])
+            if escolha == NENHUMA
+            else Resolucao(
+                "real",
+                em_disputa[escolha].id_canonico,
+                CONFIANCA_POR_CAMINHO["desempate"],
+            )
         )
 
     if any(r is None for r in resultados):

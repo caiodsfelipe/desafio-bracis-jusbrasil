@@ -1,91 +1,99 @@
 # -*- coding: utf-8 -*-
 """
-Prompt que decide se o número destacado num trecho identifica o processo
-do próprio documento ou uma decisão citada dentro dele.
+Prompt que escolhe, entre os registros do acervo que trazem o mesmo número,
+aquele a que a citação se refere.
 
-A pergunta é fechada e a resposta se limita a duas palavras. O modelo não
-produz nem localiza texto: julga um trecho já delimitado.
+A pergunta só é feita quando a posição do identificador não decide: vários
+processos foram autuados com o mesmo número e diferem apenas na espécie de
+recurso. A resposta é o índice de uma das opções apresentadas, e o modelo
+não produz nem localiza texto — escolhe entre alternativas já delimitadas.
 """
 
-PROMPT_SISTEMA = """Você analisa um trecho de um documento jurídico (acórdão) \
-e decide se o número de processo destacado nele é o número DO PRÓPRIO \
-documento, ou se é uma citação a OUTRO processo mencionado como referência \
-ou precedente dentro do texto.
+PROMPT_SISTEMA = """Você recebe uma citação a um julgado, extraída de uma \
+peça jurídica, e uma lista numerada de acórdãos cujo número de processo \
+coincide com o citado.
 
-Sinais de que é o PRÓPRIO processo (DONO):
-- O número aparece junto de uma identificação formal do processo, como \
-"RELATOR :", "RECORRENTE :", "AGRAVANTE :", "EMBARGANTE :" (com dois-pontos, \
-tipicamente em maiúsculas) — os campos de qualificação das partes do caso.
-- Ou aparece em frases como "em que é Recorrente/Embargante/Agravante ...".
+Um mesmo número identifica processos diferentes quando a espécie de recurso \
+difere: o recurso especial, o agravo interno nele interposto e os embargos \
+de divergência que o seguem tramitam com o mesmo número e são julgados em \
+acórdãos distintos. O que separa um do outro é a espécie do recurso, \
+indicada pela sigla ou pelo nome por extenso no início de cada acórdão.
 
-Sinais de que é uma CITAÇÃO a outro processo:
-- O número aparece dentro de uma frase de fundamentação ou ementa, \
-frequentemente entre parênteses, citando jurisprudência: "(REsp 123.456/SP, \
-relator Ministro Fulano, Segunda Turma, julgado em .../.../...)".
-- O nome do relator aparece em minúsculas, seguido de "Turma", "julgado em" \
-ou "DJe" — formato de referência bibliográfica de precedente, não de \
-identificação do próprio caso.
-- O número aparece numa LISTA de processos correlatos, itemizada com \
-travessões ou marcadores e ligada por expressões como "envolvendo os IPMs \
-nº ...", "(declinado)", "(prevento)", "em apenso", "conexo a". Uma lista de \
-vários números seguidos é enumeração de outros feitos, não a identificação \
-deste documento — mesmo que traga o nome do recurso por extenso antes do \
-número.
+Compare a espécie de recurso da citação com a de cada opção:
+- "AgInt no Recurso Especial" corresponde a "AgInt no RECURSO ESPECIAL", \
+não a "EMBARGOS DE DIVERGÊNCIA EM RESP";
+- "AgARR" é agravo em recurso de revista com agravo, e corresponde a \
+"RECURSO DE REVISTA COM AGRAVO", não a "AGRAVO DE INSTRUMENTO EM RECURSO \
+DE REVISTA" (AIRR);
+- "EDcl" designa embargos de declaração, "AgRg" e "AgInt" o agravo interno, \
+"RHC" o recurso em habeas corpus.
 
-ATENÇÃO: o nome do recurso escrito antes do número ("Recurso em Sentido \
-Estrito nº ...", "Apelação nº ...") NÃO é sinal de DONO por si só — aparece \
-igualmente em citações. O que caracteriza o DONO é o número vir acompanhado \
-da identificação formal do julgamento: RELATOR/RELATORA, as partes \
-qualificadas, o órgão julgador e a data da sessão.
+Nem sempre uma das opções é o julgado citado. O número pode aparecer nos \
+acórdãos apenas dentro de fundamentações, referindo-se a um processo que \
+não está no acervo: nesse caso, nenhuma opção é a citação, ainda que todas \
+contenham o número.
 
-Responda apenas com uma das duas palavras, sem explicação: DONO ou CITACAO.
-Se o trecho não tiver nenhum dos sinais acima, responda CITACAO (na dúvida, \
-não assuma que é o próprio processo)."""
+Responda apenas com o número da opção escolhida, sem explicação, ou com 0 \
+quando nenhuma das opções for o julgado citado."""
 
-PROMPT_USUARIO_TEMPLATE = """Trecho do documento (o número em análise aparece \
-destacado entre [[ ]]):
+PROMPT_USUARIO_TEMPLATE = """Citação encontrada na peça:
 
-{contexto_com_marcacao}
+{citacao}
 
-O número destacado é o DONO deste documento ou uma CITACAO a outro processo?"""
+Opções do acervo:
+
+{opcoes}
+
+Qual opção corresponde à citação?"""
+
+_CARACTERES_DE_CABECALHO = 200
 
 
-def montar_contexto_com_marcacao(texto: str, inicio: int, fim: int, janela: int = 150) -> str:
-    """Janela de texto ao redor do identificador, com ele destacado entre
-    [[ ]], já que a janela pode conter outros números."""
-    ini_janela = max(0, inicio - janela)
-    fim_janela = min(len(texto), fim + janela)
-    return (
-        texto[ini_janela:inicio]
-        + "[[" + texto[inicio:fim] + "]]"
-        + texto[fim:fim_janela]
+def montar_opcoes(cabecalhos: list[str]) -> str:
+    """Lista numerada a partir de 1, com o início de cada acórdão — é onde
+    a espécie do recurso e as partes aparecem."""
+    return "\n".join(
+        f"{indice}. {' '.join(texto[:_CARACTERES_DE_CABECALHO].split())}"
+        for indice, texto in enumerate(cabecalhos, start=1)
     )
 
 
-def classificar_dono_ou_citacao_lote(
-    qwen: "QwenClassificador", contextos: list[tuple[str, int, int]]
-) -> list[bool]:
-    """Classifica vários contextos (texto, inicio, fim) numa única
-    passada pela GPU."""
-    if not contextos:
+NENHUMA = -1
+
+
+def _indice_da_resposta(resposta: str, total: int) -> int:
+    """Índice 0-based lido da resposta, ou NENHUMA quando o modelo recusa
+    todas as opções. Uma resposta ilegível resolve pela primeira opção, que
+    é a de identificador mais adiantado."""
+    digitos = ""
+    for caractere in resposta.strip():
+        if caractere.isdigit():
+            digitos += caractere
+        elif digitos:
+            break
+    if not digitos:
+        return 0
+    escolha = int(digitos) - 1
+    if escolha == NENHUMA:
+        return NENHUMA
+    return escolha if 0 <= escolha < total else 0
+
+
+def escolher_registro_lote(
+    qwen: "QwenClassificador", disputas: list[tuple[str, list[str]]]
+) -> list[int]:
+    """Índice do registro escolhido para cada disputa (citação, cabeçalhos),
+    numa única passada pela GPU."""
+    if not disputas:
         return []
     prompts = [
         PROMPT_USUARIO_TEMPLATE.format(
-            contexto_com_marcacao=montar_contexto_com_marcacao(texto, inicio, fim)
+            citacao=" ".join(citacao.split()), opcoes=montar_opcoes(cabecalhos)
         )
-        for texto, inicio, fim in contextos
+        for citacao, cabecalhos in disputas
     ]
     respostas = qwen.gerar_lote(PROMPT_SISTEMA, prompts, max_novos_tokens=8)
-    return [r.texto.strip().upper().startswith("DONO") for r in respostas]
-
-
-def classificar_dono_ou_citacao(qwen: "QwenClassificador", texto: str, inicio: int, fim: int) -> bool:
-    """Verdadeiro quando o documento é o processo citado. Qualquer
-    resposta diferente de "DONO" é lida como citação a terceiro."""
-    contexto = montar_contexto_com_marcacao(texto, inicio, fim)
-    resposta = qwen.gerar(
-        PROMPT_SISTEMA,
-        PROMPT_USUARIO_TEMPLATE.format(contexto_com_marcacao=contexto),
-        max_novos_tokens=8,
-    )
-    return resposta.texto.strip().upper().startswith("DONO")
+    return [
+        _indice_da_resposta(resposta.texto, len(cabecalhos))
+        for resposta, (_, cabecalhos) in zip(respostas, disputas)
+    ]

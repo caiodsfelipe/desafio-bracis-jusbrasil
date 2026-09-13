@@ -2,28 +2,53 @@
 """
 Extração de citações com identificador por padrões estruturais.
 
-Cobre as citações que trazem número de processo, de súmula ou de artigo de
-lei, cuja forma é regular o bastante para ser descrita por padrão. As
-citações em prosa, que descrevem o julgado por tribunal, ano e relator,
-ficam a cargo do extrator via LLM (prompt_extracao.py); os dois percorrem
-o mesmo texto e seus resultados são mesclados em extracao.py.
+Cobre as citações que trazem número de processo, de súmula, de tema ou de
+artigo de lei. As que descrevem o julgado sem dar seu número ficam em
+regex_prosa.py, e o extrator via LLM (prompt_extracao.py) recolhe as formas
+que nenhum padrão previu; as três fontes percorrem o mesmo texto e seus
+resultados são mesclados em extracao.py.
 """
 import re
 
-_CONECTORES = r"(?:em|no|na|nos|nas|de|da|do|das|dos)"
+# O nome do recurso encadeia palavras em maiúscula ligadas por preposições
+# e pela conjunção — "Suspensão de Liminar e de Sentença".
+_CONECTORES = r"(?:em|no|na|nos|nas|de|da|do|das|dos|e)"
 # O "N" de "Nº" pertence ao conector do número, não ao nome do recurso.
 _TOKEN_MAIUSCULO = r"(?!N[º°](?!\w))[A-ZÀ-Ý][A-Za-zÀ-ÿ.\-]*"
 _CONECTOR_NUMERO = r"(?:[nN][º°o.]\s*)?"
-_IDENTIFICADOR = r"[\d.\-/:°ºnN() \n\xa0]*\d"
+
+# A digitalização troca dígitos por letras parecidas ("6G.838" por "68.838",
+# "170076O" por "1700760"). Elas contam como parte do número quando há um
+# dígito verdadeiro ao alcance; fora disso são texto, e incluí-las engoliria
+# a sigla da UF que vem depois do número.
+_LETRAS_OCR = "OolIGgSs"
+_UNIDADE = rf"(?:\d|[{_LETRAS_OCR}](?=[\d.\-]*\d))"
+_CORPO_IDENTIFICADOR = rf"(?:{_UNIDADE}|[.\-/:°ºnN() \n\xa0])*"
+# O número termina em dígito, ou na letra que substitui o último dígito —
+# nunca numa letra que inicia a palavra seguinte.
+_FIM_IDENTIFICADOR = rf"(?:\d|(?<=\d)[{_LETRAS_OCR}](?![A-Za-zÀ-ÿ]))"
+# O número tem ao menos dois algarismos: um dígito solto é parte do texto,
+# não identificador de processo.
+_IDENTIFICADOR = rf"\d{_CORPO_IDENTIFICADOR}{_FIM_IDENTIFICADOR}"
 _SUFIXO_UF = r"(?:\s*[-/–(]\s*[A-Z]{2}\)?)?"
 
 _PADRAO_CITACAO = re.compile(
     rf"{_TOKEN_MAIUSCULO}(?:\s+(?:{_TOKEN_MAIUSCULO}|{_CONECTORES})){{0,12}}"
-    rf"\s*{_CONECTOR_NUMERO}\d{_IDENTIFICADOR}{_SUFIXO_UF}"
+    rf"\s*{_CONECTOR_NUMERO}{_IDENTIFICADOR}{_SUFIXO_UF}"
 )
 
+# O "S" inicial e o acento sofrem a mesma troca de digitalização que os
+# números, e a palavra aparece abreviada ("Súm. 166 do TSE").
 _PADRAO_SUMULA = re.compile(
-    r"S[uú]mula(?:\s+Vinculante)?\s+\d+(?:\s+d[oa]\s+[A-ZÀ-Ý]+)?",
+    r"[S5][uúUÚ]m(?:ula)?\.?(?:\s+Vinculante)?\s+\d+(?:\s+d[oa]\s+[A-ZÀ-Ý]+)?",
+    re.IGNORECASE,
+)
+
+# Tema de repercussão geral e tema de recursos repetitivos identificam o
+# precedente pelo número do tema, não pelo número do processo.
+_PADRAO_TEMA = re.compile(
+    r"\bTem[aãáà]\s+\d[\d.]*"
+    r"(?:\s+d[oa]s?\s+(?:repercuss[ãa]o\s+geral|recursos?\s+repetitivos?))?",
     re.IGNORECASE,
 )
 
@@ -56,7 +81,7 @@ def extrair_candidatos(texto: str) -> list[tuple[int, int, str]]:
     """Spans (inicio, fim, trecho) das citações com identificador. A
     decomposição do número fica para normalizacao.py."""
     candidatos = []
-    for padrao in (_PADRAO_CITACAO, _PADRAO_SUMULA, _PADRAO_ARTIGO):
+    for padrao in (_PADRAO_CITACAO, _PADRAO_SUMULA, _PADRAO_ARTIGO, _PADRAO_TEMA):
         for m in padrao.finditer(texto):
             if _PADRAO_PREPOSICAO_ANO.search(m.group()):
                 continue

@@ -2,7 +2,7 @@
 """
 Extração de candidatos a citação.
 
-Duas fontes independentes percorrem o mesmo texto — o regex estrutural e o
+Fontes independentes percorrem o mesmo texto — os padrões estruturais e o
 LLM — e seus resultados são mesclados numa lista única e deduplicada. O
 span de cada trecho devolvido pelo LLM é resolvido contra o texto original
 antes de entrar na lista.
@@ -10,6 +10,7 @@ antes de entrar na lista.
 from dataclasses import dataclass
 
 from regex_extracao import extrair_candidatos as extrair_por_regex
+from regex_prosa import extrair_candidatos as extrair_prosa_por_regex
 from verificacao_substring import localizar_ocorrencias
 
 
@@ -36,9 +37,12 @@ _FIM_DO_PREAMBULO = 400
 
 
 def _candidatos_do_regex(texto: str) -> list[CandidatoCitacao]:
+    """Citações delimitadas por padrão: as que trazem identificador e as
+    que descrevem o julgado por tribunal, ano e relator."""
+    achados = extrair_por_regex(texto) + extrair_prosa_por_regex(texto)
     return [
         CandidatoCitacao(inicio=inicio, fim=fim, trecho=trecho, origem="regex")
-        for inicio, fim, trecho in extrair_por_regex(texto)
+        for inicio, fim, trecho in achados
         if inicio >= _FIM_DO_PREAMBULO
     ]
 

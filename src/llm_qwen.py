@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 Interface com o Qwen3-8B para as duas tarefas do pipeline que dependem de
-compreensão de texto: a extração de citações em prosa (prompt_extracao.py)
-e a classificação de propriedade do processo (prompt_dono.py).
+compreensão de texto: a extração das citações em prosa que escapam aos
+padrões (prompt_extracao.py) e a escolha entre registros do acervo autuados
+com o mesmo número (prompt_dono.py).
 
 Modelo `Qwen/Qwen3-8B` sob licença Apache 2.0, fixado por revisão. Em
 bfloat16 ocupa cerca de 16 GB, distribuídos entre as GPUs disponíveis.
