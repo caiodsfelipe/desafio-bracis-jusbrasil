@@ -85,6 +85,34 @@ def buscar_candidatos(con: sqlite3.Connection, identificador: str) -> list[Candi
     return candidatos
 
 
+# A confiança declarada em cada predição alimenta o bônus de calibração da
+# avaliação, que compara a confiança ao acerto efetivo. Ela é uma
+# propriedade do caminho que resolveu a citação: um registro único no
+# acervo decide por si, enquanto um desempate entre vários candidatos é
+# inerentemente menos seguro. Os valores ficam abaixo da certeza absoluta
+# porque nenhum caminho é infalível, e um erro declarado como certeza custa
+# o dobro no cálculo do bônus.
+CONFIANCA_POR_CAMINHO = {
+    "normativo": 0.98,        # súmula ou artigo casado no índice normativo
+    "sem_identificador": 0.98,  # citação em prosa, sem número a resolver
+    "registro_unico": 0.95,   # um só registro do acervo contém o identificador
+    "sem_candidato": 0.90,    # nenhum registro contém o identificador
+    "desempate": 0.70,        # vários candidatos, resolvidos por posição
+    "ambiguo": 0.30,          # identificador presente em documentos demais
+}
+
+
+@dataclass
+class Resolucao:
+    classe: str
+    id_canonico: int | None
+    confianca: float
+
+    def __iter__(self):
+        """Compatível com o desempacotamento em (classe, id_canonico)."""
+        return iter((self.classe, self.id_canonico))
+
+
 def decidir_classe(candidatos_donos: list[Candidato]) -> tuple[str, int | None]:
     """Classe da citação a partir da quantidade de registros que a
     resolvem: um é `real`, nenhum é `inventada`, vários é `incompleta`."""
@@ -100,8 +128,9 @@ def resolver_citacoes(
     qwen,
     indice_normativo: dict[tuple[str, ...], int],
     candidatos: list,
-) -> list[tuple[str, int | None]]:
-    """Classe e id_canonico de cada candidato, na ordem de entrada.
+) -> list[Resolucao]:
+    """Classe, id_canonico e confiança de cada candidato, na ordem de
+    entrada.
 
     Súmulas e artigos de lei resolvem pelo índice normativo, que aponta
     para os registros próprios desses dispositivos; buscá-los no FTS
@@ -116,7 +145,7 @@ def resolver_citacoes(
     from normalizacao import normalizar_identificadores
     from prompt_dono import classificar_dono_ou_citacao_lote
 
-    resultados: list[tuple[str, int | None] | None] = [None] * len(candidatos)
+    resultados: list[Resolucao | None] = [None] * len(candidatos)
     perguntas: list[tuple[str, int, int]] = []
     # Trechos idênticos do acervo compartilham a mesma pergunta.
     indice_por_trecho: dict[tuple[str, int], int] = {}
@@ -126,14 +155,19 @@ def resolver_citacoes(
     for posicao, candidato in enumerate(candidatos):
         if eh_citacao_normativa(candidato.trecho):
             id_normativo = resolver_normativo(indice_normativo, candidato.trecho)
+            confianca = CONFIANCA_POR_CAMINHO["normativo"]
             resultados[posicao] = (
-                ("real", id_normativo) if id_normativo is not None else ("inventada", None)
+                Resolucao("real", id_normativo, confianca)
+                if id_normativo is not None
+                else Resolucao("inventada", None, confianca)
             )
             continue
 
         identificadores = normalizar_identificadores(candidato.trecho)
         if not identificadores:
-            resultados[posicao] = ("incompleta", None)
+            resultados[posicao] = Resolucao(
+                "incompleta", None, CONFIANCA_POR_CAMINHO["sem_identificador"]
+            )
             continue
 
         acervo_do_candidato: list[Candidato] = []
@@ -154,7 +188,11 @@ def resolver_citacoes(
         # Registro único: não há ambiguidade a resolver.
         distintos = {a.id_canonico for a in acervo_do_candidato}
         if len(distintos) == 1:
-            resultados[posicao] = ("real", acervo_do_candidato[0].id_canonico)
+            resultados[posicao] = Resolucao(
+                "real",
+                acervo_do_candidato[0].id_canonico,
+                CONFIANCA_POR_CAMINHO["registro_unico"],
+            )
             continue
 
         indices_perguntas: list[int] = []
@@ -170,7 +208,11 @@ def resolver_citacoes(
         if not indices_perguntas:
             # Sem candidatos classificáveis: o identificador ambíguo indica
             # que o número existe no acervo mas não identifica um registro.
-            resultados[posicao] = ("incompleta", None) if ambiguo_demais else ("inventada", None)
+            resultados[posicao] = (
+                Resolucao("incompleta", None, CONFIANCA_POR_CAMINHO["ambiguo"])
+                if ambiguo_demais
+                else Resolucao("inventada", None, CONFIANCA_POR_CAMINHO["sem_candidato"])
+            )
         else:
             pendentes.append((posicao, indices_perguntas, candidatos_acervo))
 
@@ -192,7 +234,9 @@ def resolver_citacoes(
         if classe == "incompleta":
             vencedor = min(unicos.values(), key=lambda c: c.posicao)
             classe, id_canonico = "real", vencedor.id_canonico
-        resultados[posicao] = (classe, id_canonico)
+        resultados[posicao] = Resolucao(
+            classe, id_canonico, CONFIANCA_POR_CAMINHO["desempate"]
+        )
 
     if any(r is None for r in resultados):
         raise AssertionError("todo candidato deve receber uma classe")
@@ -204,7 +248,7 @@ def resolver_citacao(
     qwen,
     indice_normativo: dict[tuple[str, ...], int],
     candidato,
-) -> tuple[str, int | None]:
+) -> Resolucao:
     """Resolve um único candidato. Para um documento inteiro, prefira
     `resolver_citacoes`, que agrupa as chamadas ao LLM."""
     return resolver_citacoes(con, qwen, indice_normativo, [candidato])[0]
