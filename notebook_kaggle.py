@@ -1,24 +1,30 @@
+"""Célula única do notebook do Kaggle: gera submission.csv.
+
+O acervo, os documentos e o código vêm do dataset anexado ao notebook. A
+extração é determinística; o modelo é carregado para a única pergunta que a
+estrutura não resolve, separar registros autuados com o mesmo número.
+"""
 import csv, os, sqlite3, sys
 
-RAIZ = "/kaggle/input/desafio-bracis-projeto"
-sys.path.insert(0, os.path.join(RAIZ, "src"))
-sys.path.insert(0, RAIZ)
+BASE = "/kaggle/input/datasets/caiodsfelipe/desafio-bracis-projeto"
+sys.path.insert(0, os.path.join(BASE, "src"))
+sys.path.insert(0, BASE)
 
 from extracao import extrair_todos
 from indice_normativo import construir_indice
 from llm_qwen import QwenClassificador
 from resolucao import resolver_citacoes
 
-con = sqlite3.connect(os.path.join(RAIZ, "desafio1_bracis.db"))
+con = sqlite3.connect(os.path.join(BASE, "desafio1_bracis.db"))
 indice = construir_indice(con)
 qwen = QwenClassificador()
 
 documentos = sorted(
-    f[:-4] for f in os.listdir(os.path.join(RAIZ, "txt")) if f.endswith(".txt")
+    f[:-4] for f in os.listdir(os.path.join(BASE, "txt")) if f.endswith(".txt")
 )
 linhas = []
 for nome in documentos:
-    caminho = os.path.join(RAIZ, "txt", nome + ".txt")
+    caminho = os.path.join(BASE, "txt", nome + ".txt")
     texto = open(caminho, encoding="utf-8").read()
     candidatos = extrair_todos(texto)
     resolucoes = resolver_citacoes(con, qwen, indice, candidatos) if candidatos else []
