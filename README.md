@@ -4,7 +4,7 @@ Verificação de citações jurídicas em pareceres gerados por IA. Dado um
 documento, localizar cada citação de jurisprudência ou de lei e classificá-la
 como `real` (com o `id_canonico` do registro), `inventada` ou `incompleta`.
 
-**Resultado na competição: 1.00755** (métrica oficial, conjunto cego).
+**Resultado na competição: 1.08734** (métrica oficial).
 
 ## Abordagem
 
@@ -167,9 +167,14 @@ anotada, onde nenhum salto as denuncia. São 223 no total.
 
 A avaliação oficial pontua contra o gabarito completo, de modo que medir
 contra o distribuído subestima o recall e conta como espúrio o que é
-acerto. `reconstruir_gabarito.py` escreve o gabarito ampliado, e a
-diferença é grande: o mesmo código mede 1.0864 contra o distribuído e
-0.9951 contra o reconstruído, tendo obtido 0.9898 na avaliação oficial.
+acerto. `reconstruir_gabarito.py` escreve o gabarito ampliado, e ele prevê
+o resultado oficial de perto, enquanto o distribuído erra por quase um
+décimo:
+
+| Versão | contra o distribuído | contra o reconstruído | oficial |
+|---|---|---|---|
+| sem as referências vagas | 1.0864 | 0.9951 | 0.9898 |
+| com as referências vagas | 0.9889 | 1.0930 | **1.0873** |
 
 ```bash
 python reconstruir_gabarito.py
