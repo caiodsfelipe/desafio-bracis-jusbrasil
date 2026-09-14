@@ -126,6 +126,7 @@ notebook_kaggle.py         célula única que gera submission.csv no Kaggle
 reconstruir_gabarito.py    recupera as citações que faltam no gabarito distribuído
 avaliar.py                 avaliação reprodutível contra o conjunto de referência
 robustez.py                score sob perturbação dos documentos
+generalizacao.py           desempenho por documento, para expor ajuste excessivo
 comparar.py                diferença de comportamento contra uma versão anterior
 ```
 
@@ -211,6 +212,12 @@ revisão do melhor resultado conhecido:
 ```bash
 python comparar.py v1.0.0
 ```
+
+`generalizacao.py` avalia cada documento isoladamente e compara com o
+conjunto inteiro. Uma parte que caia muito abaixo da referência indicaria
+que as regras se apoiam em traços de documentos específicos. A suíte
+`tests/test_generalizacao.py` complementa a medida pelo outro lado, com
+formas plausíveis e ausentes dos 26 documentos distribuídos.
 
 `robustez.py` reaplica a métrica sobre versões perturbadas dos documentos,
 preservando os spans do gabarito. É a medida que importa para um conjunto de

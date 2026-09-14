@@ -107,18 +107,50 @@ _MARCAS_DE_DIPLOMA: tuple[tuple[str, tuple[str, ...]], ...] = (
 # A ordem importa: o apelido mais específico vem primeiro, para que
 # "código de processo civil" não seja lido como "código civil".
 _DIPLOMA_NA_CITACAO: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("cpc", ("código de processo civil", "cpc", "13.105", "13105")),
-    ("cpp", ("código de processo penal", "cpp")),
-    ("codigo_penal_militar", ("código penal militar", "cpm")),
-    ("cdc", ("código de defesa do consumidor", "cdc", "8.078", "8078")),
-    ("clt", ("consolidação das leis do trabalho", "clt", "13.467", "13467")),
-    ("codigo_eleitoral", ("código eleitoral", "4.737", "4737")),
-    ("codigo_civil", ("código civil", "10.406", "10406", " cc", "/cc")),
+    ("cpc", ("código de processo civil", "codigo de processo civil", "cpc", "13.105", "13105")),
+    ("cpp", ("código de processo penal", "codigo de processo penal", "cpp")),
+    ("codigo_penal_militar", ("código penal militar", "codigo penal militar", "cpm")),
+    (
+        "cdc",
+        (
+            "código de defesa do consumidor",
+            "codigo de defesa do consumidor",
+            "cdc",
+            "8.078",
+            "8078",
+        ),
+    ),
+    (
+        "clt",
+        (
+            "consolidação das leis do trabalho",
+            "consolidacao das leis do trabalho",
+            "consolidação",
+            "clt",
+            "13.467",
+            "13467",
+        ),
+    ),
+    ("codigo_eleitoral", ("código eleitoral", "codigo eleitoral", "4.737", "4737")),
+    (
+        "codigo_civil",
+        (
+            "código civil",
+            "codigo civil",
+            "diploma civil",
+            "10.406",
+            "10406",
+            " cc",
+            "/cc",
+        ),
+    ),
     ("lc64", ("lei complementar nº 64", "lei complementar 64", "lc 64", "64/1990")),
     (
         "constituicao",
         (
             "constituição",
+            "constituicao",
+            "carta da república",
             "cf/88",
             "cf/1988",
             "carta magna",

@@ -144,7 +144,22 @@ def test_numero_presente_na_especie_citada_e_real():
     assert resolucao.caminho == "especie"
 
 
-def test_citacao_sem_especie_reconhecivel_permanece_inventada():
+def test_sigla_desconhecida_nao_nega_a_existencia_do_processo():
+    """Uma sigla fora do vocabulário deixa a citação sem espécie, e o
+    silêncio não prova que o processo não existe: errar o link custa menos
+    que declarar inventada uma citação real, que é o erro grave."""
     candidatos = [candidato(1, 48_213), candidato(2, 54_289)]
-    resolucao = _desempatar_por_posicao(candidatos, "nº 22.357")
+    resolucao = _desempatar_por_posicao(candidatos, "TP 999/DF")
+    assert resolucao.classe == "real"
+    assert resolucao.caminho == "especie_ilegivel"
+
+
+def test_especie_conhecida_e_incompativel_nega_a_existencia():
+    """Quando a espécie é legível dos dois lados e não bate, o número
+    pertence a outro feito e a citação é inventada."""
+    candidatos = [
+        candidato(1, 48_213, contexto="Mandado de Segurança deferido. MS "),
+        candidato(2, 54_289, contexto="o caso emblemático da Infraero ( MS "),
+    ]
+    resolucao = _desempatar_por_posicao(candidatos, CITACAO)
     assert (resolucao.classe, resolucao.id_canonico) == ("inventada", None)

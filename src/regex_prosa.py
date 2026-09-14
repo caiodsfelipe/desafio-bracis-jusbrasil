@@ -83,27 +83,39 @@ _PARTICIPIO_DE_LIGACAO = rf"(?:(?!{_LIGACAO}\s)[a-zà-ÿ]{{3,}}[oa]s?\s+)?"
 # tribunal: "a jurisprudência pacífica desta Corte", "o verbete sumular
 # aplicável à espécie", "a lei que disciplina a prescrição no caso". A
 # referência é real e resolve para nada, o que a torna `incompleta`.
+#
+# A fórmula tem três peças que variam de forma independente: o que se
+# invoca, o adjetivo que o qualifica e o complemento que o situa, seja o
+# órgão que o firmou, seja o alcance da matéria. O padrão descreve as
+# peças, e não as combinações observadas, para que uma redação ainda não
+# vista continue reconhecível.
 _NUCLEO_VAGO = (
-    r"(?:jurisprud[êe]nc?[eil]?[ia]a?|orienta[çc][ãa]o(?:\s+jurisprudencial)?"
-    r"|entendi\w{0,2}ento|precedentes?|ac[óo]rd[ãa]o|verbete\s+sumular"
-    r"|dispositivo|lei|normas)"
-)
-_QUALIFICADOR_VAGO = (
-    r"(?:pac[íi]fica\s+desta\s+Corte|desta\s+Corte"
-    r"|d[ao]\s+Corte\s+Superior|dos\s+tribunais\s+superiores"
-    r"|desta\s+Casa(?:\s+em\s+situa[çc][õo]es\s+an[áa]logas)?"
-    r"|sumulado\s+sobre\s+a\s+mat[ée]ria|aplic[áa]vel\s+[àa]\s+esp[ée]cie"
-    r"|constitucional\s+invocado\s+na\s+origem"
-    r"|que\s+disciplina\s+a\s+prescri[çc][ãa]o\s+no\s+caso"
-    r"|(?:legal\s+|legais\s+)?de\s+reg[êe]ncia(?:\s+da\s+mat[ée]ria)?"
-    r"|firmado\s+em\s+sede\s+de\s+recurso\s+repetitivo"
-    r"|consolidad[ao]\s+dos\s+tribunais\s+superiores"
-    r"|d[ao]\s+(?:Primeira|Segunda|Terceira|Quarta|Quinta|Sexta)\s+Turma)"
+    r"(?:jurisprud[êe]nc?[eil]?[ia]a?|orienta[çc][ãa]o|entendi\w{0,2}ento"
+    r"|precedentes?|ac[óo]rd[ãa]os?|verbete\s+sumular|enunciado(?:\s+sumular)?"
+    r"|s[úu]mula|tese|dispositivos?|preceito|lei|leis|normas?|regra)"
 )
 _ADJETIVO_VAGO = (
-    r"(?:reiterad[oa]s?|recente|iterativ[oa]s?|pac[íi]fic[oa]s?"
-    r"|consolidad[oa]s?|sumulad[oa]s?|jurisprudencial)\s+"
+    r"(?:reiterad|iterativ|not[óo]ri|pac[íi]fic|consolidad|sumulad|dominante"
+    r"|vinculante|recente|firmad|assentad|uniforme|remans|jurisprudencial"
+    r"|legal|legais|constitucional)[oa]?s?"
 )
+# O órgão que firmou o entendimento, nomeado sem identificar julgado algum.
+_ORGAO_VAGO = (
+    r"(?:desta\s+Corte|desta\s+Casa|pel[ao]\s+Corte|d[ao]\s+Corte(?:\s+Superior)?"
+    r"|d[ao]\s+Tribunal(?:\s+Superior)?|dos\s+tribunais\s+superiores"
+    r"|d[ao]s?\s+inst[âa]ncias?\s+superior(?:es)?"
+    r"|d[ao]\s+(?:Primeira|Segunda|Terceira|Quarta|Quinta|Sexta)\s+Turma"
+    r"|d[ao]\s+[ÓO]rg[ãa]o\s+Especial|d[ao]\s+Tribunal\s+Pleno)"
+)
+# O alcance da referência, no lugar do órgão ou depois dele.
+_ESCOPO_VAGO = (
+    r"(?:sobre\s+a\s+mat[ée]ria|aplic[áa]vel\s+[àa]\s+esp[ée]cie|pertinente"
+    r"|invocad[oa]\s+na\s+origem|de\s+reg[êe]ncia(?:\s+da\s+mat[ée]ria)?"
+    r"|aplic[áa]vel|que\s+(?:disciplina|rege)\s+[^,.]{3,40}"
+    r"|em\s+sede\s+de\s+recurso\s+repetitivo|em\s+repercuss[ãa]o\s+geral"
+    r"|em\s+situa[çc][õo]es\s+an[áa]logas)"
+)
+_COMPLEMENTO_VAGO = rf"(?:{_ORGAO_VAGO}|{_ESCOPO_VAGO})"
 
 _PADROES = (
     # "reiterados precedentes do Superior Tribunal de Justiça",
@@ -123,8 +135,8 @@ _PADROES = (
     # invocação de um precedente da afirmação de que a jurisprudência está
     # assentada, que é argumentação: "a orientação dos tribunais superiores
     # é firme no ponto".
-    rf"\b(?:{_ADJETIVO_VAGO})?{_NUCLEO_VAGO}\s+(?:{_ADJETIVO_VAGO})?"
-    rf"{_QUALIFICADOR_VAGO}(?!\s+[ée]\s+firme)",
+    rf"\b(?:{_ADJETIVO_VAGO}\s+)?{_NUCLEO_VAGO}(?:\s+{_ADJETIVO_VAGO})?"
+    rf"(?:\s+{_COMPLEMENTO_VAGO})(?:\s+{_COMPLEMENTO_VAGO})?(?!\s+[ée]\s+firme)",
 )
 
 _COMPILADOS = tuple(re.compile(p) for p in _PADROES)

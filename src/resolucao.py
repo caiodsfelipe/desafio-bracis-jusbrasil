@@ -137,6 +137,7 @@ CONFIANCA_POR_CAMINHO = {
     "especie": 0.95,          # o número consta do acervo na espécie citada
     "desempate": 0.90,        # vários registros, separados pelo modelo
     "so_mencionado": 0.90,    # o número só aparece citado, nunca como autuação
+    "especie_ilegivel": 0.60,  # a sigla da citação não está no vocabulário
     "ambiguo": 0.30,          # identificador presente em documentos demais
 }
 
@@ -183,12 +184,20 @@ def _resolver_pela_especie(ordenados: list[Candidato], trecho: str) -> Resolucao
     número: um número que só consta como mandado de segurança não responde
     por uma reclamação. Entre os registros compatíveis vence o de ocorrência
     mais adiantada, que é o que mais se aproxima de uma autuação.
+
+    A espécie decide apenas quando é legível dos dois lados. Uma sigla que
+    o vocabulário não conhece deixa a citação sem espécie, e aí o silêncio
+    não é prova de que o processo não existe: a decisão recai sobre a
+    ocorrência mais adiantada, que erra o link na pior das hipóteses, em
+    vez de negar a existência do processo, que é o erro grave.
     """
     from especie_recurso import familia, familia_da_ocorrencia
 
     especie_citada = familia(trecho)
     if especie_citada is None:
-        return resolvido_por("so_mencionado", "inventada")
+        return resolvido_por(
+            "especie_ilegivel", "real", min(ordenados, key=_ordem_de_preferencia).id_canonico
+        )
     compativeis = [
         c
         for c in ordenados
