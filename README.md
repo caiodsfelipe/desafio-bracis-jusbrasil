@@ -95,10 +95,13 @@ conjunto de referência isso ocorre uma vez em 195 citações, e é a única
 consulta ao modelo em todo o pipeline. Trocar a resposta por qualquer valor
 fixo muda o score em menos de 0.007.
 
-**A confiança declarada é medida, não estimada.** Cada caminho de resolução tem
-a sua, calibrada pela taxa de acerto observada e verificada sob degradação
-simulada: o esquema adotado rende mais que a alternativa agressiva assim que a
-acurácia cai alguns pontos, que é o cenário do conjunto cego.
+**A confiança declarada é medida, não estimada.** Cada caminho tem a sua,
+calibrada pela taxa de acerto observada. O bônus mede a distância entre a
+confiança e o acerto efetivo, de modo que rebaixá-la abaixo da taxa medida
+custa tanto quanto exagerá-la. Todos os caminhos acertam integralmente o
+conjunto de referência, e o valor que maximiza o bônus é 0,99: fica acima de
+0,98 quando tudo acerta e à frente de 1,00 quando três predições falham,
+porque declarar certeza absoluta e errar custa o dobro.
 
 ## Estrutura
 

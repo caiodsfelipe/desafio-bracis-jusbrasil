@@ -83,21 +83,35 @@ def test_um_por_registro_mantem_a_ocorrencia_mais_adiantada():
     ]
 
 
-@pytest.mark.parametrize(
-    "caminho, minimo",
-    [
-        ("normativo", 0.98),
-        ("sem_identificador", 0.98),
-        ("registro_unico", 0.97),
-        ("sem_candidato", 0.96),
-        ("cabecalho", 0.95),
-    ],
+CAMINHOS_DETERMINISTICOS = (
+    "normativo",
+    "sem_identificador",
+    "registro_unico",
+    "sem_candidato",
+    "cabecalho",
 )
-def test_confianca_dos_caminhos_deterministicos(caminho, minimo):
-    """O bônus de calibração mede a distância entre a confiança declarada e
-    o acerto efetivo. Estes caminhos acertam tudo no conjunto de referência,
-    e rebaixar a confiança abaixo do valor medido custa bônus."""
-    assert CONFIANCA_POR_CAMINHO[caminho] >= minimo
+
+
+@pytest.mark.parametrize("caminho", CAMINHOS_DETERMINISTICOS)
+def test_confianca_dos_caminhos_deterministicos(caminho):
+    """O bônus mede a distância entre a confiança declarada e o acerto
+    efetivo. Estes caminhos acertam tudo no conjunto de referência, e
+    rebaixar a confiança abaixo do valor medido custa bônus."""
+    assert CONFIANCA_POR_CAMINHO[caminho] == 0.99
+
+
+@pytest.mark.parametrize("caminho", CAMINHOS_DETERMINISTICOS)
+def test_confianca_nao_declara_certeza_absoluta(caminho):
+    """Declarar 1,0 e errar custa o dobro: com três predições erradas em
+    224, 0,99 rende mais bônus que 1,0."""
+    assert CONFIANCA_POR_CAMINHO[caminho] < 1.0
+
+
+def test_caminhos_dependentes_de_sinal_indireto_declaram_menos():
+    """A espécie do recurso e a escolha do modelo são sinais mais frágeis
+    que a posição do número no cabeçalho."""
+    for caminho in ("especie", "desempate", "so_mencionado"):
+        assert CONFIANCA_POR_CAMINHO[caminho] < CONFIANCA_POR_CAMINHO["cabecalho"]
 
 
 def test_resolucao_carrega_o_caminho_que_a_produziu():

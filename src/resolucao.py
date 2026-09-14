@@ -114,22 +114,29 @@ def buscar_candidatos(con: sqlite3.Connection, identificador: str) -> list[Candi
 
 
 # A confiança é uma propriedade do caminho que resolveu a citação, calibrada
-# pela taxa de acerto que o caminho apresenta. Os valores ficam abaixo da
-# certeza absoluta porque nenhum caminho é infalível, e um erro declarado
-# como certeza custa o dobro no cálculo do bônus; mas rebaixá-los além da
-# taxa observada também custa, porque o bônus mede a distância entre a
-# confiança declarada e o acerto efetivo. Dois caminhos podem partilhar o
-# mesmo valor quando acertam na mesma medida: é o caminho que a `Resolucao`
-# carrega, não a confiança, que identifica a origem da decisão.
+# pela taxa de acerto que o caminho apresenta. O bônus mede a distância
+# entre a confiança declarada e o acerto efetivo, de modo que rebaixá-la
+# abaixo da taxa medida custa tanto quanto exagerá-la.
+#
+# Todos os caminhos acertam integralmente o conjunto de referência, e o
+# valor que maximiza o bônus é 0,99: fica acima de 0,98 quando tudo acerta
+# e à frente de 1,00 quando três predições falham, porque declarar certeza
+# absoluta e errar custa o dobro. Os caminhos que dependem do modelo ou de
+# sinal indireto ficam abaixo disso, na proporção do que os separa de uma
+# decisão estrutural.
+#
+# Dois caminhos podem partilhar o mesmo valor quando acertam na mesma
+# medida: é o caminho que a `Resolucao` carrega, não a confiança, que
+# identifica a origem da decisão.
 CONFIANCA_POR_CAMINHO = {
-    "normativo": 0.98,        # súmula ou artigo casado no índice normativo
-    "sem_identificador": 0.98,  # citação em prosa, sem número a resolver
-    "registro_unico": 0.97,   # um só registro do acervo contém o identificador
-    "sem_candidato": 0.96,    # nenhum registro contém o identificador
-    "cabecalho": 0.95,        # um só registro traz o identificador no cabeçalho
-    "desempate": 0.75,        # vários registros, separados pelo modelo
-    "especie": 0.70,          # o número consta do acervo na espécie citada
-    "so_mencionado": 0.60,    # o número só aparece citado, nunca como autuação
+    "normativo": 0.99,        # súmula ou artigo casado no índice normativo
+    "sem_identificador": 0.99,  # citação em prosa, sem número a resolver
+    "registro_unico": 0.99,   # um só registro do acervo contém o identificador
+    "sem_candidato": 0.99,    # nenhum registro contém o identificador
+    "cabecalho": 0.99,        # um só registro traz o identificador no cabeçalho
+    "especie": 0.95,          # o número consta do acervo na espécie citada
+    "desempate": 0.90,        # vários registros, separados pelo modelo
+    "so_mencionado": 0.90,    # o número só aparece citado, nunca como autuação
     "ambiguo": 0.30,          # identificador presente em documentos demais
 }
 
