@@ -81,6 +81,13 @@ as duas espécies são o mesmo processo em fases distintas. É o que distingue
 uma referência a processo inexistente de uma referência legítima, já que
 ambas encontram documentos na busca por texto.
 
+**A espécie do recurso separa feitos de mesmo número.** O acórdão anuncia no
+cabeçalho a espécie que julga, e a sigla da citação nomeia a mesma espécie
+abreviada: "AgARR" é o agravo em recurso de revista com agravo, não o agravo
+de instrumento que o precedeu, ainda que os dois tramitem com aquele número.
+Casar as duas resolve tanto a disputa entre registros quanto a pergunta de
+se o processo citado existe.
+
 **O modelo decide só o que a estrutura não decide.** Ele é consultado quando
 dois processos foram autuados com o mesmo número e diferem apenas na espécie
 do recurso, caso em que só a leitura dos cabeçalhos separa um do outro. No

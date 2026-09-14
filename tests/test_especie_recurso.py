@@ -56,3 +56,31 @@ def test_nome_por_extenso_decide_antes_da_sigla():
     """O acórdão que se anuncia como mandado de segurança traz a sigla MS
     adiante; o nome por extenso é o que vale."""
     assert familia("Mandado de Segurança deferido. (MS 22357, Rel.") == "mandado"
+
+
+@pytest.mark.parametrize(
+    "cabecalho, citacao, esperado",
+    [
+        ("A C Ó R D Ã O I. AGRAVO DA RECLAMANTE. RECURSO DE REVISTA COM AGRAVO.",
+         "TST-AgARR-25823-78.2015.5.24.0091", True),
+        ("A C Ó R D Ã O AGRAVO DE INSTRUMENTO EM RECURSO DE REVISTA REGIDO PELA LEI",
+         "TST-AgARR-25823-78.2015.5.24.0091", False),
+        ("AgInt no RECURSO ESPECIAL Nº 1.597.443 - PR", "AgInt no REsp 1.597.443", True),
+        ("AgInt nosEMBARGOS DE DIVERGÊNCIA EM RESP Nº 1597443",
+         "AgInt no REsp 1.597.443", False),
+    ],
+)
+def test_cabecalho_declara_a_especie_citada(cabecalho, citacao, esperado):
+    """O acórdão anuncia no cabeçalho a espécie que julga, e é isso que
+    separa dois feitos que tramitam com o mesmo número."""
+    from especie_recurso import declara_a_especie_citada
+
+    assert declara_a_especie_citada(cabecalho, citacao) is esperado
+
+
+def test_citacao_sem_sigla_nao_declara_especie():
+    """Sem sigla na citação não há o que casar, e a ausência de sinal não
+    deve decidir sozinha."""
+    from especie_recurso import declara_a_especie_citada
+
+    assert declara_a_especie_citada("RECURSO ESPECIAL Nº 1.234", "processo nº 1.234") is False

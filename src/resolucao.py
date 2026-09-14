@@ -189,8 +189,14 @@ def _resolver_pela_especie(ordenados: list[Candidato], trecho: str) -> Resolucao
     ]
     if not compativeis:
         return resolvido_por("so_mencionado", "inventada")
+    # Entre os compatíveis, o que anuncia a espécie no próprio cabeçalho é
+    # o julgado citado; sem isso vence a ocorrência mais adiantada.
+    from especie_recurso import declara_a_especie_citada
+
+    anunciam = [c for c in compativeis if declara_a_especie_citada(c.texto, trecho)]
+    escolhidos = anunciam if len(anunciam) == 1 else compativeis
     return resolvido_por(
-        "especie", "real", min(compativeis, key=_ordem_de_preferencia).id_canonico
+        "especie", "real", min(escolhidos, key=_ordem_de_preferencia).id_canonico
     )
 
 
@@ -229,6 +235,15 @@ def _desempatar_por_posicao(
         )
     if len(no_cabecalho) == 1:
         return resolvido_por("cabecalho", "real", primeiro.id_canonico)
+
+    # Vários registros autuaram o número, e o cabeçalho de cada um anuncia
+    # a espécie que julga: quando só um anuncia a que a citação nomeia, é
+    # ele o julgado citado.
+    from especie_recurso import declara_a_especie_citada
+
+    anunciam = [c for c in no_cabecalho if declara_a_especie_citada(c.texto, trecho)]
+    if len(anunciam) == 1:
+        return resolvido_por("especie", "real", anunciam[0].id_canonico)
     return None
 
 
