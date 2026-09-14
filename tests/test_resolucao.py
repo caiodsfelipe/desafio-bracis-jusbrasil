@@ -16,30 +16,41 @@ from resolucao import (
     resolvido_por,
 )
 
+# Espécie nomeada na citação sob teste; a resolução a compara com o que
+# aparece ao redor do número em cada registro.
+CITACAO = "Reclamação nº 22.357/PE"
 
-def candidato(id_canonico, posicao, documento_id="doc"):
+
+def candidato(id_canonico, posicao, documento_id="doc", contexto=""):
+    """Candidato com a ocorrência posicionada dentro de um texto sintético,
+    para que a leitura da espécie ao redor do número encontre o contexto."""
+    enchimento = "x" * max(0, posicao - 1 - len(contexto))
+    texto = enchimento + contexto + "0000000"
     return Candidato(
         documento_id=documento_id,
         id_canonico=id_canonico,
         tribunal=None,
         natureza="acordao",
         posicao=posicao,
-        texto="",
-        ocorrencia=(posicao - 1, posicao + 10),
+        texto=texto,
+        ocorrencia=(len(enchimento) + len(contexto), len(texto)),
     )
 
 
 def test_um_registro_no_cabecalho_responde_pela_citacao():
     candidatos = [candidato(1, 48), candidato(2, 13_707)]
-    resolucao = _desempatar_por_posicao(candidatos)
+    resolucao = _desempatar_por_posicao(candidatos, CITACAO)
     assert (resolucao.classe, resolucao.id_canonico) == ("real", 1)
 
 
-def test_numero_so_mencionado_e_citacao_inventada():
-    """Nenhum registro traz o número no cabeçalho: ele consta do acervo
-    apenas dentro de fundamentações, e nenhum processo responde por ele."""
-    candidatos = [candidato(1, 48_213), candidato(2, 54_289)]
-    resolucao = _desempatar_por_posicao(candidatos)
+def test_numero_so_mencionado_em_outra_especie_e_inventada():
+    """Nenhum registro traz o número no cabeçalho, e onde ele aparece o
+    feito é de outra espécie: nenhum processo responde pela citação."""
+    candidatos = [
+        candidato(1, 48_213, contexto="Mandado de Segurança deferido. MS "),
+        candidato(2, 54_289, contexto="o caso emblemático da Infraero ( MS "),
+    ]
+    resolucao = _desempatar_por_posicao(candidatos, CITACAO)
     assert (resolucao.classe, resolucao.id_canonico) == ("inventada", None)
 
 
@@ -47,7 +58,7 @@ def test_copias_do_mesmo_acordao_resolvem_pelo_menor_id():
     """Duas cópias do mesmo acórdão trazem o número na mesma posição e
     nenhum critério textual as separa; a escolha só precisa ser estável."""
     candidatos = [candidato(1_973_691_658, 1_644), candidato(867_328_396, 1_645)]
-    resolucao = _desempatar_por_posicao(candidatos)
+    resolucao = _desempatar_por_posicao(candidatos, CITACAO)
     assert (resolucao.classe, resolucao.id_canonico) == ("real", 867_328_396)
 
 
@@ -55,7 +66,7 @@ def test_processos_distintos_no_cabecalho_vao_ao_modelo():
     """Mesmo número, dois processos, ambos autuados: só a espécie do
     recurso decide, e a posição não basta."""
     candidatos = [candidato(1, 30), candidato(2, 74)]
-    assert _desempatar_por_posicao(candidatos) is None
+    assert _desempatar_por_posicao(candidatos, CITACAO) is None
 
 
 def test_limite_do_cabecalho_acomoda_a_autuacao_do_tst():
@@ -96,3 +107,30 @@ def test_resolucao_carrega_o_caminho_que_a_produziu():
     assert resolucao.caminho == "cabecalho"
     assert resolucao.confianca == CONFIANCA_POR_CAMINHO["cabecalho"]
     assert tuple(resolucao) == ("real", 42)
+
+
+def test_numero_presente_na_especie_citada_e_real():
+    """O número não está em cabeçalho nenhum, mas aparece transcrito num
+    feito da mesma espécie: o processo existe, ainda que o acervo não
+    guarde o acórdão que o autuou."""
+    candidatos = [
+        candidato(
+            1,
+            4_310,
+            contexto="autos de Agravo de Instrumento em Recurso de Revista nº TST-AIRR-",
+        ),
+        candidato(
+            2,
+            32_488,
+            contexto='Agravo de instrumento não provido". (PROCESSO Nº TST-AIRR-',
+        ),
+    ]
+    resolucao = _desempatar_por_posicao(candidatos, "TST-AgARR-25823-78.2015.5.24.0091")
+    assert (resolucao.classe, resolucao.id_canonico) == ("real", 1)
+    assert resolucao.caminho == "especie"
+
+
+def test_citacao_sem_especie_reconhecivel_permanece_inventada():
+    candidatos = [candidato(1, 48_213), candidato(2, 54_289)]
+    resolucao = _desempatar_por_posicao(candidatos, "nº 22.357")
+    assert (resolucao.classe, resolucao.id_canonico) == ("inventada", None)

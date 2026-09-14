@@ -128,6 +128,7 @@ CONFIANCA_POR_CAMINHO = {
     "sem_candidato": 0.96,    # nenhum registro contém o identificador
     "cabecalho": 0.95,        # um só registro traz o identificador no cabeçalho
     "desempate": 0.75,        # vários registros, separados pelo modelo
+    "especie": 0.70,          # o número consta do acervo na espécie citada
     "so_mencionado": 0.60,    # o número só aparece citado, nunca como autuação
     "ambiguo": 0.30,          # identificador presente em documentos demais
 }
@@ -168,7 +169,34 @@ def _um_por_registro(candidatos: list[Candidato]) -> list[Candidato]:
     return sorted(por_registro.values(), key=_ordem_de_preferencia)
 
 
-def _desempatar_por_posicao(candidatos: list[Candidato]) -> "Resolucao | None":
+def _resolver_pela_especie(ordenados: list[Candidato], trecho: str) -> Resolucao:
+    """Classe da citação cujo número o acervo traz apenas em fundamentações.
+
+    A espécie nomeada na citação precisa reaparecer junto da ocorrência do
+    número: um número que só consta como mandado de segurança não responde
+    por uma reclamação. Entre os registros compatíveis vence o de ocorrência
+    mais adiantada, que é o que mais se aproxima de uma autuação.
+    """
+    from especie_recurso import familia, familia_da_ocorrencia
+
+    especie_citada = familia(trecho)
+    if especie_citada is None:
+        return resolvido_por("so_mencionado", "inventada")
+    compativeis = [
+        c
+        for c in ordenados
+        if familia_da_ocorrencia(c.texto, c.ocorrencia[0]) == especie_citada
+    ]
+    if not compativeis:
+        return resolvido_por("so_mencionado", "inventada")
+    return resolvido_por(
+        "especie", "real", min(compativeis, key=_ordem_de_preferencia).id_canonico
+    )
+
+
+def _desempatar_por_posicao(
+    candidatos: list[Candidato], trecho: str
+) -> "Resolucao | None":
     """Resolve a citação pela posição do identificador nos registros
     encontrados, e devolve None quando a posição não decide.
 
@@ -178,15 +206,16 @@ def _desempatar_por_posicao(candidatos: list[Candidato]) -> "Resolucao | None":
     acervo e qualquer uma responde pela citação.
 
     Quando nenhum registro traz o número no cabeçalho, o número aparece no
-    acervo apenas dentro de fundamentações, é citado e nunca autuado, e
-    não existe processo com ele: a citação é inventada. É o que distingue
-    uma referência a processo inexistente de uma referência legítima, já
-    que ambas encontram documentos na busca por texto.
+    acervo apenas dentro de fundamentações, e a espécie do recurso decide:
+    se nenhum dos registros trata daquela espécie, não existe processo com
+    o número citado e a citação é inventada. Se algum trata, o processo
+    existe e foi transcrito ali, ainda que o acervo não guarde o acórdão
+    que o autuou.
     """
     ordenados = _um_por_registro(candidatos)
     no_cabecalho = [c for c in ordenados if c.posicao < _LIMITE_CABECALHO]
     if not no_cabecalho:
-        return resolvido_por("so_mencionado", "inventada")
+        return _resolver_pela_especie(ordenados, trecho)
 
     primeiro = no_cabecalho[0]
     duplicatas = [
@@ -283,7 +312,7 @@ def resolver_citacoes(
             )
             continue
 
-        resolucao = _desempatar_por_posicao(acervo_do_candidato)
+        resolucao = _desempatar_por_posicao(acervo_do_candidato, candidato.trecho)
         if resolucao is not None:
             resultados[posicao] = resolucao
             continue

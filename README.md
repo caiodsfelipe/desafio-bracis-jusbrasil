@@ -72,10 +72,14 @@ caracteres adiante. Medido sobre o acervo: 76 dos 77 processos citados trazem o
 número antes de 2000 caracteres, contra 3 dos 24 documentos que só o mencionam.
 O limite acomoda o cabeçalho do TST, o mais longo, que alcança 1100 caracteres.
 
-**Número que nenhum registro traz no cabeçalho é citação inventada.** Ele
-consta do acervo apenas dentro de fundamentações, e nenhum processo responde
-por ele. É o que distingue uma referência a processo inexistente de uma
-referência legítima, já que ambas encontram documentos na busca por texto.
+**Número que nenhum registro traz no cabeçalho é decidido pela espécie do
+recurso.** Ele consta do acervo apenas dentro de fundamentações, e a espécie
+diz se existe processo com ele: um número que só aparece como mandado de
+segurança não responde por uma reclamação, mas um que aparece transcrito
+num recurso de revista responde por um agravo naquele mesmo recurso, porque
+as duas espécies são o mesmo processo em fases distintas. É o que distingue
+uma referência a processo inexistente de uma referência legítima, já que
+ambas encontram documentos na busca por texto.
 
 **O modelo decide só o que a estrutura não decide.** Ele é consultado quando
 dois processos foram autuados com o mesmo número e diferem apenas na espécie
@@ -95,6 +99,7 @@ acurácia cai alguns pontos, que é o cenário do conjunto cego.
 src/
   regex_extracao.py        citações com identificador (processo, súmula, tema, artigo)
   regex_prosa.py           citações sem identificador (tribunal, ano, relator)
+  especie_recurso.py       família do recurso, que separa feitos de mesmo número
   extracao.py              mescla as fontes e deduplica por IoU
   normalizacao.py          normaliza o identificador dentro do span
   indice_normativo.py      índice dos 18 registros de súmula e dispositivo
