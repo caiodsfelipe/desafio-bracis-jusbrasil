@@ -4,7 +4,12 @@ Verificação de citações jurídicas em pareceres gerados por IA. Dado um
 documento, localizar cada citação de jurisprudência ou de lei e classificá-la
 como `real` (com o `id_canonico` do registro), `inventada` ou `incompleta`.
 
-**Resultado na competição: 1.08734** (métrica oficial).
+**Resultado na competição: 1.09803** (métrica oficial, fase de treino).
+
+O leaderboard atual roda sobre a amostra de treino distribuída, e reinicia
+quando o conjunto final for ativado: a classificação sai de 40% públicos e
+60% privados de documentos que ninguém viu. O que vale, portanto, é
+generalizar, e não pontuar nestes 26 documentos.
 
 ## Abordagem
 
