@@ -120,3 +120,41 @@ def test_letra_no_lugar_do_primeiro_algarismo(texto):
 )
 def test_separador_de_milhar_como_espaco(texto, esperado):
     assert esperado in trechos(texto)
+
+
+@pytest.mark.parametrize(
+    "texto, esperado",
+    [
+        ("Também na Reclamação nº 33.125/SP, o Tribunal", "Reclamação nº 33.125/SP"),
+        ("Também no Recurso Especial n° 2.467-.648-RS", "Recurso Especial n° 2.467-.648-RS"),
+        ("Ainda na Reclamação nº 66.516/RO", "Reclamação nº 66.516/RO"),
+    ],
+)
+def test_adverbio_de_abertura_fica_fora_do_span(texto, esperado):
+    """O advérbio tem forma de nome de recurso, mas introduz a citação em
+    vez de fazer parte dela."""
+    assert esperado in trechos(texto)
+
+
+@pytest.mark.parametrize(
+    "texto",
+    [
+        "processo nº TST-RR-79500-16.2009.5.15.0016",
+        "processo nº TST-E-RR-173000-49.2008.5.15.0024",
+    ],
+)
+def test_designacao_de_processo_entra_no_span(texto):
+    """A palavra que designa o feito antecede o número e integra a
+    citação."""
+    assert texto in trechos(texto)
+
+
+@pytest.mark.parametrize(
+    "texto, esperado",
+    [
+        ("art 60 da Lei nº 13.467/2017. O", "art 60 da Lei nº 13.467/2017"),
+        ("artigo 172 da Lei nº 9.504/1997. A", "artigo 172 da Lei nº 9.504/1997"),
+    ],
+)
+def test_ponto_final_fica_fora_do_numero_do_diploma(texto, esperado):
+    assert esperado in trechos(texto)

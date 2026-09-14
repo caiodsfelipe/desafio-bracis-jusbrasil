@@ -46,8 +46,13 @@ _ORGAO_FRACIONARIO = (
 _ORGAO_JULGADOR = rf"{_ORGAO_FRACIONARIO}{_TRIBUNAL}"
 
 # O nome do relator vem em maiúsculas ou capitalizado, com preposições no
-# meio: "José Roberto Freire Pimenta", "ARTUR VIDIGAL DE OLIVEIRA".
-_NOME = r"[A-ZÀ-Ý][\wÀ-ÿ.]*(?:\s+(?:d[aeo]s?|e|[A-ZÀ-Ý][\wÀ-ÿ.]*)){0,5}"
+# meio: "José Roberto Freire Pimenta", "ARTUR VIDIGAL DE OLIVEIRA". O ponto
+# só continua o nome quando encerra uma abreviatura ("Min.", "Rel."), e não
+# quando encerra a frase, para que o span pare no último elemento do nome.
+_PALAVRA_DE_NOME = (
+    r"[A-ZÀ-Ý][\wÀ-ÿ]{0,2}\.(?=\s*[A-ZÀ-Ý])|[A-ZÀ-Ý][\wÀ-ÿ]*"
+)
+_NOME = rf"(?:{_PALAVRA_DE_NOME})(?:\s+(?:d[aeo]s?|e|{_PALAVRA_DE_NOME})){{0,5}}"
 
 # A digitalização confunde "e" com "c", e "de" chega como "dc".
 _DE = r"d[ceo]"
@@ -90,7 +95,7 @@ _QUALIFICADOR_VAGO = (
     r"|sumulado\s+sobre\s+a\s+mat[ée]ria|aplic[áa]vel\s+[àa]\s+esp[ée]cie"
     r"|constitucional\s+invocado\s+na\s+origem"
     r"|que\s+disciplina\s+a\s+prescri[çc][ãa]o\s+no\s+caso"
-    r"|de\s+reg[êe]ncia\s+da\s+mat[ée]ria"
+    r"|(?:legal\s+|legais\s+)?de\s+reg[êe]ncia(?:\s+da\s+mat[ée]ria)?"
     r"|firmado\s+em\s+sede\s+de\s+recurso\s+repetitivo"
     r"|consolidad[ao]\s+dos\s+tribunais\s+superiores"
     r"|d[ao]\s+(?:Primeira|Segunda|Terceira|Quarta|Quinta|Sexta)\s+Turma)"

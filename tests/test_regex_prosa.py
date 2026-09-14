@@ -148,3 +148,33 @@ def test_formulas_vagas_nao_se_confundem_com_argumentacao():
     for formula in sempre_citacao:
         assert formula in trechos(formula), formula
     assert trechos("a orientação dos tribunais superiores é firme no ponto") == []
+
+
+@pytest.mark.parametrize(
+    "texto, esperado",
+    [
+        (
+            "Rcl de 2025, Rel. Min. CÁRMEN LÚCIA.\n\nIII",
+            "Rcl de 2025, Rel. Min. CÁRMEN LÚCIA",
+        ),
+        (
+            "Reclamação do STF, de 2020, Rel. Min. Celso De Mello. Antes de",
+            "Reclamação do STF, de 2020, Rel. Min. Celso De Mello",
+        ),
+        (
+            "julgado do STF proferido em 2024 pela relatoria de Dias Toffoli. A",
+            "julgado do STF proferido em 2024 pela relatoria de Dias Toffoli",
+        ),
+    ],
+)
+def test_nome_do_relator_para_no_fim_da_frase(texto, esperado):
+    """O ponto continua o nome quando encerra abreviatura ("Rel.", "Min."),
+    e o encerra quando encerra a frase."""
+    assert esperado in trechos(texto)
+
+
+def test_dispositivo_legal_de_regencia_e_citacao():
+    """Irmã de "normas de regência da matéria", que o gabarito anota."""
+    assert "dispositivo legal de regência" in trechos(
+        "A pretensão encontra amparo expresso no dispositivo legal de regência."
+    )

@@ -12,7 +12,17 @@ import re
 # e pela conjunção, como em "Suspensão de Liminar e de Sentença".
 _CONECTORES = r"(?:em|no|na|nos|nas|de|da|do|das|dos|e)"
 # O "N" de "Nº" pertence ao conector do número, não ao nome do recurso.
-_TOKEN_MAIUSCULO = r"(?!N[º°](?!\w))[A-ZÀ-Ý][A-Za-zÀ-ÿ.\-]*"
+# O advérbio que abre a frase tem forma de nome de recurso, mas introduz a
+# citação em vez de fazer parte dela: em "Também na Reclamação nº 33.125" a
+# citação começa em "Reclamação".
+_ADVERBIOS_DE_ABERTURA = r"Tamb[ée]m|Ainda|Assim|Ademais|Outrossim|Igualmente"
+_TOKEN_MAIUSCULO = (
+    rf"(?!N[º°](?!\w))(?!(?:{_ADVERBIOS_DE_ABERTURA})\b)[A-ZÀ-Ý][A-Za-zÀ-ÿ.\-]*"
+)
+
+# A palavra "processo" antecede o número como parte da designação do feito,
+# e o gabarito a inclui no span.
+_DESIGNACAO_DE_PROCESSO = r"(?:[Pp]rocessos?|[Aa]utos)\s+(?:n[º°o.]\s*)?"
 _CONECTOR_NUMERO = r"(?:[nN][º°o.]\s*)?"
 
 # A digitalização troca dígitos por letras parecidas ("6G.838" por "68.838",
@@ -38,6 +48,7 @@ _IDENTIFICADOR = rf"{_INICIO_IDENTIFICADOR}{_CORPO_IDENTIFICADOR}{_FIM_IDENTIFIC
 _SUFIXO_UF = r"(?:\s*[-/–(]\s*[A-Z]{2}\)?)?"
 
 _PADRAO_CITACAO = re.compile(
+    rf"(?:{_DESIGNACAO_DE_PROCESSO})?"
     rf"{_TOKEN_MAIUSCULO}(?:\s+(?:{_TOKEN_MAIUSCULO}|{_CONECTORES})){{0,12}}"
     rf"\s*{_CONECTOR_NUMERO}{_IDENTIFICADOR}{_SUFIXO_UF}"
 )
@@ -71,7 +82,9 @@ _PALAVRA_DIPLOMA = r"(?:[A-ZÀ-Ý][a-zà-ÿ]+|d[aeo]s?|e)"
 _DIPLOMA = (
     r"(?:[A-ZÀ-Ý]{2,}"                                   # sigla: CPC, CLT, CDC
     rf"|[A-ZÀ-Ý][a-zà-ÿ]+(?:\s+{_PALAVRA_DIPLOMA}){{0,5}}"  # ou nome por extenso
-    r"(?:\s*n[º°.]?\s*[\d./-]+)?)"                       # e eventual "nº 9.504/1997"
+    # e eventual "nº 9.504/1997": o número termina em algarismo, para que o
+    # ponto que encerra a frase fique de fora do span
+    r"(?:\s*n[º°.]?\s*\d[\d./-]*\d)?)"
 )
 # A distinção de caixa delimita o nome do diploma, separando-o do texto
 # que vem depois; por isso o padrão é sensível a maiúsculas.
