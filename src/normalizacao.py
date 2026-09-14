@@ -134,18 +134,31 @@ def _normalizar_bloco(bloco: str) -> str:
 # Ano precedido de preposição é a data do julgamento, não um identificador.
 _PREPOSICAO_ANO = re.compile(r"\b(?:de|em)\s+((?:19|20)\d{2})\b", re.IGNORECASE)
 
+# O dígito colado à sigla do tribunal identifica a região, não o processo:
+# em "TRF1" e "TRT 15" o número faz parte do nome do órgão, e sozinho casa
+# com metade do acervo.
+_DIGITO_DE_ORGAO = re.compile(
+    r"\b(?:TRF|TRT|TRE|CJF|JEF)\s*-?\s*(\d{1,2})\b", re.IGNORECASE
+)
+
+# Um identificador de processo tem mais de um algarismo; um só é resto de
+# sigla, de inciso ou de numeração de item.
+_MINIMO_DE_ALGARISMOS = 2
+
 
 def normalizar_identificadores(span: str) -> list[str]:
     """Identificadores normalizados presentes no span, um por bloco
     numérico. Lista vazia quando a citação não traz identificador, caso do
     julgado referido apenas por tribunal, ano e relator."""
-    anos_de_julgado = set(_PREPOSICAO_ANO.findall(span))
+    descartados = set(_PREPOSICAO_ANO.findall(span))
+    descartados.update(_DIGITO_DE_ORGAO.findall(span))
     identificadores = []
     for bloco in _BLOCO_CANDIDATO.findall(span):
         if not any(c.isdigit() for c in bloco):
             continue
         normalizado = _normalizar_bloco(bloco)
-        if normalizado.replace(".", "") in anos_de_julgado:
+        algarismos = re.sub(r"\D", "", normalizado)
+        if len(algarismos) < _MINIMO_DE_ALGARISMOS or algarismos in descartados:
             continue
         identificadores.append(normalizado)
     return identificadores

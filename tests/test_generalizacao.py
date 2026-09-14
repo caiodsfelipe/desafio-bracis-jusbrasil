@@ -115,3 +115,34 @@ def test_sigla_fora_do_vocabulario_nao_tem_familia():
     """A ausência é aceitável; o que a resolução não pode fazer é tratá-la
     como prova de que o processo não existe."""
     assert familia("TP 999") is None
+
+
+@pytest.mark.parametrize(
+    "texto",
+    [
+        "julgado do TRF1 proferido em 2020 pela relatoria de João Silva",
+        "acórdão do TRT 15 de 2021",
+        "julgado do TRE-BA de 2022",
+    ],
+)
+def test_digito_da_sigla_do_orgao_nao_e_identificador(texto):
+    """Em "TRF1" e "TRT 15" o número nomeia a região, não o processo, e um
+    algarismo solto casa com metade do acervo."""
+    from normalizacao import normalizar_identificadores
+
+    assert normalizar_identificadores(texto) == []
+
+
+@pytest.mark.parametrize(
+    "texto, esperado",
+    [
+        ("REsp 1.234.567/SP", ["1.234.567"]),
+        ("Rcl 33.132/AC", ["33.132"]),
+        ("Súmula 83 do STJ", ["83"]),
+        ("TST-AgARR-25823-78.2015.5.24.0091", ["25823-78.2015.5.24.0091"]),
+    ],
+)
+def test_identificador_legitimo_sobrevive_ao_filtro(texto, esperado):
+    from normalizacao import normalizar_identificadores
+
+    assert normalizar_identificadores(texto) == esperado
