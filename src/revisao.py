@@ -8,5 +8,5 @@ no momento de empacotar, por `empacotar.py`, e sai junto com o resultado.
 """
 
 # Preenchido por empacotar.py a cada geração do zip.
-COMMIT = "6e3f4abc81228388f6c32694fa0c612946711a55"
-GERADO_EM = "2026-09-16T18:06:31+00:00"
+COMMIT = "1bb931c15b097572525241994bf023a35dfc2b48"
+GERADO_EM = "2026-09-16T18:06:54+00:00"
