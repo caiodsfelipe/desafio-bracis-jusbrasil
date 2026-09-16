@@ -23,7 +23,6 @@ def trechos(texto):
         "acórdão do TSE julgado em 2020 sob relatoria de Edson Fachin",
         "Reclamação do STF, de 2025, Rel. Min. CRISTIANO ZANIN",
         "Rcl de 2021, Rel. Min. Rosa Weber",
-        "artigo correspondente do Código de Processo Civil",
     ],
 )
 def test_moldes_do_conjunto_de_referencia(trecho):
@@ -39,7 +38,7 @@ def test_moldes_do_conjunto_de_referencia(trecho):
         "jurisprudência do TST consolidada em 2018",
         "precedente da Corte Especial do STJ de 2020",
         "acórdão da Segunda Turma do STF, de 2023, Rel. Min. Gilmar Mendes",
-        "orientação jurisprudencial do TST",
+        "orientação jurisprudencial do TST de 2019",
         "AgRg de 2020, Rel. Min. Og Fernandes",
         "RMS de 2019, Rel. Min. Sebastião Reis",
         "julgado do TRT 2 de 2022",
@@ -68,10 +67,6 @@ def test_participio_corrompido_nao_impede_a_citacao():
     "texto, esperado",
     [
         (
-            "caminham os reiterados\nprecedentes do Superior Tribunal de Justiça.",
-            "reiterados\nprecedentes do Superior Tribunal de Justiça",
-        ),
-        (
             "precedente da Corte Especial do STJ de 2020",
             "precedente da Corte Especial do STJ de 2020",
         ),
@@ -89,65 +84,6 @@ def test_termo_jurisprudencial_nao_engole_a_sumula_seguinte():
     absorvê-la."""
     assert trechos("Corrobora esse entendimento a Súmula 935\ndo STF, que") == []
 
-
-
-@pytest.mark.parametrize(
-    "trecho",
-    [
-        "jurisprudência pacífica desta Corte",
-        "orientação jurisprudencial da Corte Superior",
-        "verbete sumular aplicável à espécie",
-        "entendimento sumulado sobre a matéria",
-        "precedentes desta Casa em situações análogas",
-        "precedente firmado em sede de recurso repetitivo",
-        "jurisprudência consolidada dos tribunais superiores",
-        "dispositivo constitucional invocado na origem",
-        "lei que disciplina a prescrição no caso",
-        "normas de regência da matéria",
-        "recente acórdão da Segunda Turma",
-    ],
-)
-def test_referencia_vaga_e_citacao(trecho):
-    """A peça invoca o precedente ou a norma sem nomear número nem tribunal.
-    A referência é real, resolve para nada, e o gabarito a classifica como
-    incompleta."""
-    assert trecho in trechos(trecho)
-
-
-@pytest.mark.parametrize(
-    "trecho",
-    [
-        "entendirnento sumulado sobre a matéria",
-        "jurisprudêneia consolidada dos tribunais superiores",
-    ],
-)
-def test_referencia_vaga_com_ruido_de_digitalizacao(trecho):
-    assert trecho in trechos(trecho)
-
-
-def test_estado_da_jurisprudencia_nao_e_citacao():
-    """"A orientação dos tribunais superiores é firme no ponto" afirma que a
-    jurisprudência está assentada; não invoca precedente algum."""
-    texto = "Cumpre observar que a orientação dos tribunais superiores é firme no ponto."
-    assert trechos(texto) == []
-
-
-def test_formulas_vagas_nao_se_confundem_com_argumentacao():
-    """No corpus, cada fórmula vaga é sempre citação, e a fórmula que afirma
-    o estado da jurisprudência nunca é. A separação é limpa, sem caso em que
-    a mesma redação sirva às duas funções."""
-    sempre_citacao = (
-        "verbete sumular aplicável à espécie",
-        "jurisprudência pacífica desta Corte",
-        "orientação jurisprudencial da Corte Superior",
-        "entendimento sumulado sobre a matéria",
-        "precedente firmado em sede de recurso repetitivo",
-        "lei que disciplina a prescrição no caso",
-        "dispositivo constitucional invocado na origem",
-    )
-    for formula in sempre_citacao:
-        assert formula in trechos(formula), formula
-    assert trechos("a orientação dos tribunais superiores é firme no ponto") == []
 
 
 @pytest.mark.parametrize(
@@ -171,10 +107,3 @@ def test_nome_do_relator_para_no_fim_da_frase(texto, esperado):
     """O ponto continua o nome quando encerra abreviatura ("Rel.", "Min."),
     e o encerra quando encerra a frase."""
     assert esperado in trechos(texto)
-
-
-def test_dispositivo_legal_de_regencia_e_citacao():
-    """Irmã de "normas de regência da matéria", que o gabarito anota."""
-    assert "dispositivo legal de regência" in trechos(
-        "A pretensão encontra amparo expresso no dispositivo legal de regência."
-    )

@@ -71,7 +71,7 @@ PERTURBACOES = (
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--acervo", default=str(RAIZ / "desafio1_bracis.db"))
-    parser.add_argument("--gabarito", default=str(RAIZ / "goldenset.csv"))
+    parser.add_argument("--gabarito", default=str(RAIZ / "goldenset_offsets.csv"))
     parser.add_argument("--documentos", default=str(RAIZ / "txt"))
     argumentos = parser.parse_args()
 
@@ -84,7 +84,7 @@ def main():
     con = sqlite3.connect(argumentos.acervo)
     indice = construir_indice(con)
     gabarito = collections.defaultdict(list)
-    with open(argumentos.gabarito, encoding="utf-8") as arquivo:
+    with open(argumentos.gabarito, encoding="utf-8-sig") as arquivo:
         for linha in csv.DictReader(arquivo):
             gabarito[linha["documento_id"]].append(linha)
 

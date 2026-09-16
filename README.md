@@ -4,7 +4,7 @@ Verificação de citações jurídicas em pareceres gerados por IA. Dado um
 documento, localizar cada citação de jurisprudência ou de lei e classificá-la
 como `real` (com o `id_canonico` do registro), `inventada` ou `incompleta`.
 
-**Resultado na competição: 1.09803** (métrica oficial, fase de treino).
+**Resultado na competição: 1.09803** (métrica oficial, sobre a versão anterior do dataset).
 
 O leaderboard atual roda sobre a amostra de treino distribuída, e reinicia
 quando o conjunto final for ativado: a classificação sai de 40% públicos e
@@ -46,8 +46,8 @@ texto do documento
 
 ### Decisões que moldaram o desenho
 
-**A extração não consulta o modelo.** Os padrões alcançam as 195 citações do
-conjunto de referência, que é o mesmo conjunto que a avaliação oficial usa.
+**A extração não consulta o modelo.** Os padrões alcançam as 192 citações do
+conjunto de referência.
 Um trecho apontado só pelo modelo cai necessariamente fora dessas formas e
 entra como candidato sem nada que o sustente. Medido: a etapa custava 0,079
 do score, porque um candidato espúrio por documento tira 0,096 e não havia
@@ -86,6 +86,18 @@ as duas espécies são o mesmo processo em fases distintas. É o que distingue
 uma referência a processo inexistente de uma referência legítima, já que
 ambas encontram documentos na busca por texto.
 
+**Uma referência só é citação quando aponta um julgado determinado.** O órgão
+sozinho descreve um conjunto difuso: "reiterados precedentes do Superior
+Tribunal de Justiça" e "a jurisprudência pacífica desta Corte" não apontam
+acórdão nenhum e não são citação. O que estreita a referência a um julgado é
+o ano ou o relator, e a classe `incompleta` reúne justamente as que trazem
+órgão e um dos dois, sem o número.
+
+**O dono do número é quem o apresenta como os autos que julga.** A fórmula de
+autuação abre o acórdão ("Vistos, relatados e discutidos estes autos de
+Recurso de Revista nº X"), e onde ela falta o número está sendo transcrito de
+outro feito. É o que resolve dois acórdãos que trazem o mesmo número.
+
 **A espécie do recurso separa feitos de mesmo número.** O acórdão anuncia no
 cabeçalho a espécie que julga, e a sigla da citação nomeia a mesma espécie
 abreviada: "AgARR" é o agravo em recurso de revista com agravo, não o agravo
@@ -113,7 +125,7 @@ porque declarar certeza absoluta e errar custa o dobro.
 ```
 src/
   regex_extracao.py        citações com identificador (processo, súmula, tema, artigo)
-  regex_prosa.py           citações sem identificador (tribunal, ano, relator)
+  regex_prosa.py           citações sem identificador (órgão, ano, relator)
   especie_recurso.py       família do recurso, que separa feitos de mesmo número
   extracao.py              mescla as fontes e deduplica por IoU
   normalizacao.py          normaliza o identificador dentro do span
@@ -123,7 +135,6 @@ src/
   prompts/                 prompts versionados, com histórico e notas
 tests/                     suíte de regressão, sem banco e sem modelo
 notebook_kaggle.py         célula única que gera submission.csv no Kaggle
-reconstruir_gabarito.py    recupera as citações que faltam no gabarito distribuído
 avaliar.py                 avaliação reprodutível contra o conjunto de referência
 robustez.py                score sob perturbação dos documentos
 generalizacao.py           desempenho por documento, para expor ajuste excessivo
@@ -177,30 +188,6 @@ python robustez.py               # score sob perturbação dos documentos
 caminho de resolução, marcando com `*` os caminhos que dependem do modelo.
 `--json relatorio.json` grava o relatório completo com commit e versões de
 prompt.
-
-### O gabarito distribuído está incompleto
-
-O `goldenset.csv` traz 195 citações, mas a numeração de `citacao_id` salta:
-faltam 25 identificadores dentro das sequências. Em cada salto, o texto
-entre a citação anterior e a seguinte traz exatamente uma referência vaga a
-precedente ou a norma, e outras três aparecem depois da última citação
-anotada, onde nenhum salto as denuncia. São 223 no total.
-
-A avaliação oficial pontua contra o gabarito completo, de modo que medir
-contra o distribuído subestima o recall e conta como espúrio o que é
-acerto. `reconstruir_gabarito.py` escreve o gabarito ampliado, e ele prevê
-o resultado oficial de perto, enquanto o distribuído erra por quase um
-décimo:
-
-| Versão | contra o distribuído | contra o reconstruído | oficial |
-|---|---|---|---|
-| sem as referências vagas | 1.0864 | 0.9951 | 0.9898 |
-| com as referências vagas | 0.9889 | 1.0930 | **1.0873** |
-
-```bash
-python reconstruir_gabarito.py
-python avaliar.py --gabarito gabarito_reconstruido.csv
-```
 
 `comparar.py <revisão>` mostra a diferença de comportamento contra uma
 versão anterior do próprio repositório, em duas frentes: as predições de

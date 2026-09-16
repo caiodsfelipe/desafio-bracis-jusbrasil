@@ -22,31 +22,39 @@ def _trecho(texto, extrair):
 
 
 @pytest.mark.parametrize(
-    "texto, esperado",
+    "texto",
     [
-        ("a jurisprudência pacífica do Tribunal", "jurisprudência pacífica do Tribunal"),
-        ("o entendimento consolidado desta Corte", "entendimento consolidado desta Corte"),
-        ("a orientação sumulada da Corte Superior", "orientação sumulada da Corte Superior"),
-        ("o precedente vinculante sobre a matéria", "precedente vinculante sobre a matéria"),
-        ("a súmula aplicável à espécie", "súmula aplicável à espécie"),
-        ("a tese firmada em repercussão geral", "tese firmada em repercussão geral"),
-        ("o enunciado sumular pertinente", "enunciado sumular pertinente"),
-        ("os precedentes reiterados desta Casa", "precedentes reiterados desta Casa"),
-        ("o entendimento firmado pela Corte", "entendimento firmado pela Corte"),
-        ("a norma de regência aplicável", "norma de regência aplicável"),
-        ("o dispositivo legal invocado na origem", "dispositivo legal invocado na origem"),
-        ("a lei que rege a matéria", "lei que rege a matéria"),
-        ("o acórdão da Terceira Turma", "acórdão da Terceira Turma"),
-        (
-            "a orientação uniforme das instâncias superiores",
-            "orientação uniforme das instâncias superiores",
-        ),
+        "decisão do STJ de 2020, Rel. Min. Herman Benjamin",
+        "aresto do STF de 2019, da relatoria de Luiz Fux",
+        "entendimento firmado pelo STJ em 2021",
+        "jurisprudência do TST consolidada em 2018",
+        "acórdão da Segunda Turma do STF, de 2023, Rel. Min. Gilmar Mendes",
+        "precedente da Corte Especial do STJ de 2020",
+        "orientação jurisprudencial do TST de 2019",
+        "julgado do TRF4 de 2021, Rel. Des. Maria",
     ],
 )
-def test_referencia_vaga_em_redacao_nova(texto, esperado):
-    """A fórmula tem peças que variam de forma independente, e o padrão
-    descreve as peças e não as combinações observadas."""
-    assert _trecho(texto, extrair_em_prosa) == esperado
+def test_julgado_descrito_em_redacao_nova(texto):
+    """A citação identifica o julgado pelo órgão e pelo ano ou relator. O
+    padrão descreve as peças, e não as combinações observadas."""
+    assert _trecho(texto, extrair_em_prosa) == texto
+
+
+@pytest.mark.parametrize(
+    "texto",
+    [
+        "reiterados precedentes do Superior Tribunal de Justiça",
+        "a jurisprudência pacífica desta Corte",
+        "o verbete sumular aplicável à espécie",
+        "artigo correspondente do Código de Processo Civil",
+        "o entendimento sumulado sobre a matéria",
+        "a orientação dos tribunais superiores é firme no ponto",
+    ],
+)
+def test_referencia_sem_fonte_especifica_nao_e_citacao(texto):
+    """O órgão sozinho aponta um conjunto difuso de julgados, não um
+    acórdão determinado, e o gabarito não o trata como citação."""
+    assert extrair_em_prosa(texto) == []
 
 
 @pytest.mark.parametrize(

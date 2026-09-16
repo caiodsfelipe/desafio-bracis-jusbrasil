@@ -53,8 +53,11 @@ class ModeloAusente:
 
 
 def carregar_gabarito(caminho):
+    """Gabarito por documento. O arquivo distribuído vem com marca de ordem
+    de bytes, que `utf-8-sig` descarta para que a primeira coluna tenha o
+    nome esperado."""
     por_documento = collections.defaultdict(list)
-    with open(caminho, encoding="utf-8") as arquivo:
+    with open(caminho, encoding="utf-8-sig") as arquivo:
         for linha in csv.DictReader(arquivo):
             por_documento[linha["documento_id"]].append(linha)
     return por_documento
@@ -142,7 +145,7 @@ def versao_do_codigo():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--acervo", default=str(RAIZ / "desafio1_bracis.db"))
-    parser.add_argument("--gabarito", default=str(RAIZ / "goldenset.csv"))
+    parser.add_argument("--gabarito", default=str(RAIZ / "goldenset_offsets.csv"))
     parser.add_argument("--documentos", default=str(RAIZ / "txt"))
     parser.add_argument("--com-modelo", action="store_true")
     parser.add_argument("--json", help="grava o relatório completo neste arquivo")

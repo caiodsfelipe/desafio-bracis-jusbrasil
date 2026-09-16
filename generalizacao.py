@@ -65,7 +65,7 @@ def _avaliar(documentos, gabarito, con, indice, modelo, pasta):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--acervo", default=str(RAIZ / "desafio1_bracis.db"))
-    parser.add_argument("--gabarito", default=str(RAIZ / "goldenset.csv"))
+    parser.add_argument("--gabarito", default=str(RAIZ / "goldenset_offsets.csv"))
     parser.add_argument("--documentos", default=str(RAIZ / "txt"))
     parser.add_argument("--partes", type=int, default=_PARTES_PADRAO)
     argumentos = parser.parse_args()

@@ -50,47 +50,6 @@ _FAMILIA_POR_EXTENSO = {
 
 _SIGLAS_POR_TAMANHO = sorted(_FAMILIA_POR_SIGLA, key=len, reverse=True)
 
-# O acórdão anuncia no cabeçalho a espécie que julga, por extenso. A sigla
-# da citação nomeia a mesma espécie de forma abreviada, e casar as duas
-# separa dois acórdãos que tramitam com o mesmo número: "AgARR" é o agravo
-# em recurso de revista com agravo, e não o agravo de instrumento que o
-# precedeu.
-_ESPECIE_POR_EXTENSO = {
-    "AGARR": "RECURSO DE REVISTA COM AGRAVO",
-    "ARR": "RECURSO DE REVISTA COM AGRAVO",
-    "AIRR": "AGRAVO DE INSTRUMENTO EM RECURSO DE REVISTA",
-    "RR": "RECURSO DE REVISTA",
-    "RESPE": "RECURSO ESPECIAL ELEITORAL",
-    "RESP": "RECURSO ESPECIAL",
-    "ARESP": "AGRAVO EM RECURSO ESPECIAL",
-    "RCL": "RECLAMAÇÃO",
-    "RMS": "RECURSO EM MANDADO DE SEGURANÇA",
-    "MS": "MANDADO DE SEGURANÇA",
-    "RHC": "RECURSO EM HABEAS CORPUS",
-    "HC": "HABEAS CORPUS",
-    "RSE": "RECURSO EM SENTIDO ESTRITO",
-    "RE": "RECURSO EXTRAORDINÁRIO",
-    "APL": "APELAÇÃO",
-}
-_SIGLAS_COM_EXTENSO = sorted(_ESPECIE_POR_EXTENSO, key=len, reverse=True)
-
-# Quanto do início do acórdão anuncia a espécie julgada.
-_CABECALHO = 300
-
-
-def declara_a_especie_citada(texto_do_registro: str, trecho_da_citacao: str) -> bool:
-    """O acórdão anuncia no cabeçalho a espécie que a citação nomeia.
-
-    Devolve falso quando a citação não traz sigla reconhecível, para que a
-    ausência de sinal nunca decida sozinha.
-    """
-    citada = trecho_da_citacao.upper()
-    for sigla in _SIGLAS_COM_EXTENSO:
-        if re.search(rf"(?:\b|-){sigla}(?:\b|-)", citada):
-            cabecalho = " ".join(texto_do_registro[:_CABECALHO].split()).upper()
-            return _ESPECIE_POR_EXTENSO[sigla] in cabecalho
-    return False
-
 # Quanto do texto ao redor da ocorrência nomeia a espécie: a designação vem
 # imediatamente antes do número.
 _CONTEXTO_ANTES = 80
@@ -113,3 +72,18 @@ def familia_da_ocorrencia(texto: str, inicio: int) -> str | None:
     """Família nomeada ao redor da ocorrência do número no acervo."""
     janela = texto[max(0, inicio - _CONTEXTO_ANTES) : inicio + _CONTEXTO_DEPOIS]
     return familia(" ".join(janela.split()))
+
+
+# A fórmula de autuação abre o acórdão e apresenta os autos que ele julga:
+# "Vistos, relatados e discutidos estes autos de Recurso de Revista nº X".
+# Onde ela antecede o número, o acórdão é o processo; onde falta, o número
+# está sendo transcrito de outro feito.
+_FORMULA_DE_AUTUACAO = re.compile(
+    r"Vistos,?\s+relatados|estes\s+autos\s+de|autos\s+em\s+que", re.IGNORECASE
+)
+
+
+def autua_o_processo(texto: str, inicio: int) -> bool:
+    """O número é apresentado como os autos que o acórdão julga."""
+    antes = texto[max(0, inicio - _CONTEXTO_ANTES) : inicio]
+    return bool(_FORMULA_DE_AUTUACAO.search(" ".join(antes.split())))

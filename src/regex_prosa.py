@@ -79,64 +79,21 @@ _QUALIFICADOR = (
 # ligação que vem em seguida não serve como particípio.
 _PARTICIPIO_DE_LIGACAO = rf"(?:(?!{_LIGACAO}\s)[a-zà-ÿ]{{3,}}[oa]s?\s+)?"
 
-# A peça também invoca o precedente ou a norma sem nomear nem número nem
-# tribunal: "a jurisprudência pacífica desta Corte", "o verbete sumular
-# aplicável à espécie", "a lei que disciplina a prescrição no caso". A
-# referência é real e resolve para nada, o que a torna `incompleta`.
-#
-# A fórmula tem três peças que variam de forma independente: o que se
-# invoca, o adjetivo que o qualifica e o complemento que o situa, seja o
-# órgão que o firmou, seja o alcance da matéria. O padrão descreve as
-# peças, e não as combinações observadas, para que uma redação ainda não
-# vista continue reconhecível.
-_NUCLEO_VAGO = (
-    r"(?:jurisprud[êe]nc?[eil]?[ia]a?|orienta[çc][ãa]o|entendi\w{0,2}ento"
-    r"|precedentes?|ac[óo]rd[ãa]os?|verbete\s+sumular|enunciado(?:\s+sumular)?"
-    r"|s[úu]mula|tese|dispositivos?|preceito|lei|leis|normas?|regra)"
-)
-_ADJETIVO_VAGO = (
-    r"(?:reiterad|iterativ|not[óo]ri|pac[íi]fic|consolidad|sumulad|dominante"
-    r"|vinculante|recente|firmad|assentad|uniforme|remans|jurisprudencial"
-    r"|legal|legais|constitucional)[oa]?s?"
-)
-# O órgão que firmou o entendimento, nomeado sem identificar julgado algum.
-_ORGAO_VAGO = (
-    r"(?:desta\s+Corte|desta\s+Casa|pel[ao]\s+Corte|d[ao]\s+Corte(?:\s+Superior)?"
-    r"|d[ao]\s+Tribunal(?:\s+Superior)?|dos\s+tribunais\s+superiores"
-    r"|d[ao]s?\s+inst[âa]ncias?\s+superior(?:es)?"
-    r"|d[ao]\s+(?:Primeira|Segunda|Terceira|Quarta|Quinta|Sexta)\s+Turma"
-    r"|d[ao]\s+[ÓO]rg[ãa]o\s+Especial|d[ao]\s+Tribunal\s+Pleno)"
-)
-# O alcance da referência, no lugar do órgão ou depois dele.
-_ESCOPO_VAGO = (
-    r"(?:sobre\s+a\s+mat[ée]ria|aplic[áa]vel\s+[àa]\s+esp[ée]cie|pertinente"
-    r"|invocad[oa]\s+na\s+origem|de\s+reg[êe]ncia(?:\s+da\s+mat[ée]ria)?"
-    r"|aplic[áa]vel|que\s+(?:disciplina|rege)\s+[^,.]{3,40}"
-    r"|em\s+sede\s+de\s+recurso\s+repetitivo|em\s+repercuss[ãa]o\s+geral"
-    r"|em\s+situa[çc][õo]es\s+an[áa]logas)"
-)
-_COMPLEMENTO_VAGO = rf"(?:{_ORGAO_VAGO}|{_ESCOPO_VAGO})"
+# A citação identifica o julgado por três elementos, e o órgão sozinho não
+# basta: "reiterados precedentes do Superior Tribunal de Justiça" aponta um
+# conjunto difuso, não um acórdão, e não é citação. O ano ou o relator é o
+# que estreita a referência a um julgado determinado.
+_DATA_OU_RELATOR = rf"(?:{_DATA}(?:[\s,]*{_RELATOR})?|[\s,]*{_RELATOR})"
 
 _PADROES = (
-    # "reiterados precedentes do Superior Tribunal de Justiça",
     # "julgado do STF proferido em 2024 pela relatoria de Dias Toffoli",
     # "entendimento firmado pelo STJ em 2021"
     rf"\b{_QUALIFICADOR}{_TERMO_JURISPRUDENCIAL}\s+{_PARTICIPIO_DE_LIGACAO}"
-    rf"{_LIGACAO}\s+{_ORGAO_JULGADOR}(?![\wÀ-ÿ])"
-    rf"{_DATA}?(?:[\s,]*{_RELATOR})?",
+    rf"{_LIGACAO}\s+{_ORGAO_JULGADOR}(?![\wÀ-ÿ]){_DATA_OU_RELATOR}",
     # "Reclamação do STF, de 2025, Rel. Min. CRISTIANO ZANIN"
     rf"\b{_ESPECIE_DE_RECURSO}\s+d[oa]\s+{_ORGAO_JULGADOR}{_DATA}[\s,]*{_RELATOR}",
     # "Rcl de 2021, Rel. Min. Rosa Weber"
     rf"\b{_ESPECIE_DE_RECURSO}\s+(?:em|{_DE})\s*{_ANO}[\s,]*{_RELATOR}",
-    # "artigo correspondente do Código de Processo Civil"
-    r"\bartigos?\s+correspondentes?\s+d[oa]\s+"
-    r"[A-ZÀ-Ý][\wÀ-ÿ]*(?:\s+(?:d[aeo]s?|[A-ZÀ-Ý][\wÀ-ÿ]*)){0,5}",
-    # "a jurisprudência pacífica desta Corte". A ressalva ao fim separa a
-    # invocação de um precedente da afirmação de que a jurisprudência está
-    # assentada, que é argumentação: "a orientação dos tribunais superiores
-    # é firme no ponto".
-    rf"\b(?:{_ADJETIVO_VAGO}\s+)?{_NUCLEO_VAGO}(?:\s+{_ADJETIVO_VAGO})?"
-    rf"(?:\s+{_COMPLEMENTO_VAGO})(?:\s+{_COMPLEMENTO_VAGO})?(?!\s+[ée]\s+firme)",
 )
 
 _COMPILADOS = tuple(re.compile(p) for p in _PADROES)
