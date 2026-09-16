@@ -96,16 +96,23 @@ CAMINHOS_DETERMINISTICOS = (
 def test_confianca_dos_caminhos_deterministicos(caminho):
     """O bônus mede a distância entre a confiança declarada e o acerto
     efetivo. Estes caminhos acertam tudo nas duas versões do conjunto de
-    referência, e rebaixar a confiança abaixo do valor medido custa bônus."""
-    assert CONFIANCA_POR_CAMINHO[caminho] == 0.9999
+    referência, e rebaixar a confiança abaixo do valor medido custa bônus.
+
+    Só o brier exatamente zero leva o bônus a 0,10 cheio: 0,9999 produz
+    0,099999999, o score fica em 1,099999999 e o leaderboard, que trunca em
+    cinco casas, exibe 1,09999 em vez de 1,10000."""
+    assert CONFIANCA_POR_CAMINHO[caminho] == 1.0
 
 
-@pytest.mark.parametrize("caminho", CAMINHOS_DETERMINISTICOS)
-def test_confianca_nao_declara_certeza_absoluta(caminho):
-    """0,9999 alcança o teto do bônus quando tudo acerta, de modo que 1,0
-    nada acrescenta e deixa a afirmação de certeza absoluta sem margem para
-    o caso não observado."""
-    assert CONFIANCA_POR_CAMINHO[caminho] < 1.0
+def test_bonus_maximo_exige_brier_exatamente_zero():
+    """A casa decimal que separa 1,09999 de 1,10000 no leaderboard, medida
+    sobre a fórmula do bônus."""
+    teto = 0.10
+    for confianca, esperado in ((1.0, 0.10), (0.9999, 0.099999999)):
+        brier = (confianca - 1) ** 2
+        assert teto * (1 - brier) == pytest.approx(esperado, abs=1e-12)
+    assert int((1 + 0.099999999) * 100000) / 100000 == 1.09999
+    assert int((1 + 0.10) * 100000) / 100000 == 1.10000
 
 
 def test_caminhos_dependentes_de_sinal_indireto_nao_declaram_confianca():

@@ -119,33 +119,30 @@ def buscar_candidatos(con: sqlite3.Connection, identificador: str) -> list[Candi
 # abaixo da taxa medida custa tanto quanto exagerá-la.
 #
 # Os caminhos estruturais acertam integralmente as duas versões do conjunto
-# de referência, e declaram 0,9999. O valor foi medido sobre a métrica
-# oficial, variando a confiança de uma submissão perfeita e de submissões
-# com erro injetado:
+# de referência, e declaram 1,0. O valor sai de uma propriedade do
+# arredondamento, não de uma convicção sobre o acervo: o bônus é
+# 0,10·(1 − brier), e um brier de 1e-8, o que 0,9999 produz quando tudo
+# acerta, dá 0,099999999. O score fica em 1,099999999 e o leaderboard, que
+# trunca em cinco casas, exibe 1,09999. Só o brier exatamente zero fecha em
+# 1,10000.
 #
-#   erros em 192      0,99          0,9999
-#   ------------      ----------    ----------
-#   nenhum            1,0999900     1,1000000
-#   dois              1,0857492     1,0857385
-#   quarenta          0,7904143     0,7901114
+#   erros em 192      0,9999 (truncado)   1,0 (truncado)
+#   ------------      -----------------   --------------
+#   nenhum                      1,09999          1,10000
+#   dois                        1,08573          1,08573
+#   quarenta                    0,79011          0,79010
 #
-# O ganho máximo é 0,00001 e a perda máxima 0,0003, contra os 0,0034 que uma
-# única citação mal classificada custa: a escolha vive duas ordens de
-# grandeza abaixo do que decide o resultado, e 0,9999 é preferido por
-# alcançar o teto quando o conjunto oculto se comporta como os conhecidos.
-# Declarar 1,00 não acrescenta nada, e deixa a afirmação de certeza absoluta
-# sem margem para o caso não observado.
+# A partir do primeiro erro a diferença cai para a ordem de 1e-7, invisível
+# no truncamento: o dígito que 1,0 ganha quando tudo acerta não tem
+# contrapartida mensurável quando não acerta.
 #
-# Os caminhos que dependem do modelo ou de sinal indireto ficam abaixo
-# disso, na proporção do que os separa de uma decisão estrutural.
+# A margem para o caso não observado não está nesta casa decimal, e sim no
+# campo omitido.
 #
-# Dois caminhos podem partilhar o mesmo valor quando acertam na mesma
-# medida: é o caminho que a `Resolucao` carrega, não a confiança, que
-# identifica a origem da decisão.
 # O campo é opcional na submissão, e a média do Brier corre apenas sobre as
 # citações que o declaram: omiti-lo numa citação a retira do cálculo sem
 # tirá-la da classificação. Para um caminho que pode errar, calar domina
-# qualquer valor declarado — se acerta, a média das demais já está no teto e
+# qualquer valor declarado: se acerta, a média das demais já está no teto e
 # nada se perde; se erra, o termo que puxaria o bônus para baixo não entra.
 # Medido em 75 combinações de fração de caminho incerto, taxa de erro e
 # semente, omitir nunca ficou atrás de declarar, e chegou a render 0,0157.
@@ -153,14 +150,18 @@ def buscar_candidatos(con: sqlite3.Connection, identificador: str) -> list[Candi
 # Por isso os caminhos que dependem do modelo ou de sinal indireto não
 # declaram confiança: OMITIR não é ausência de estimativa, é a estimativa
 # de que ali a taxa de acerto não foi medida em amostra que a sustente.
+#
+# Dois caminhos podem partilhar o mesmo valor quando acertam na mesma
+# medida: é o caminho que a `Resolucao` carrega, não a confiança, que
+# identifica a origem da decisão.
 OMITIR = None
 
 CONFIANCA_POR_CAMINHO = {
-    "normativo": 0.9999,      # súmula ou artigo casado no índice normativo
-    "sem_identificador": 0.9999,  # citação em prosa, sem número a resolver
-    "registro_unico": 0.9999,  # um só registro do acervo contém o identificador
-    "sem_candidato": 0.9999,  # nenhum registro contém o identificador
-    "cabecalho": 0.9999,      # um só registro traz o identificador no cabeçalho
+    "normativo": 1.0,      # súmula ou artigo casado no índice normativo
+    "sem_identificador": 1.0,  # citação em prosa, sem número a resolver
+    "registro_unico": 1.0,  # um só registro do acervo contém o identificador
+    "sem_candidato": 1.0,  # nenhum registro contém o identificador
+    "cabecalho": 1.0,      # um só registro traz o identificador no cabeçalho
     "especie": OMITIR,        # o número consta do acervo na espécie citada
     "desempate": OMITIR,      # vários registros, separados pelo modelo
     "so_mencionado": OMITIR,  # o número só aparece citado, nunca como autuação
