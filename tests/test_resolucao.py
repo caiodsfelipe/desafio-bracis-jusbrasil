@@ -95,15 +95,16 @@ CAMINHOS_DETERMINISTICOS = (
 @pytest.mark.parametrize("caminho", CAMINHOS_DETERMINISTICOS)
 def test_confianca_dos_caminhos_deterministicos(caminho):
     """O bônus mede a distância entre a confiança declarada e o acerto
-    efetivo. Estes caminhos acertam tudo no conjunto de referência, e
-    rebaixar a confiança abaixo do valor medido custa bônus."""
-    assert CONFIANCA_POR_CAMINHO[caminho] == 0.99
+    efetivo. Estes caminhos acertam tudo nas duas versões do conjunto de
+    referência, e rebaixar a confiança abaixo do valor medido custa bônus."""
+    assert CONFIANCA_POR_CAMINHO[caminho] == 0.9999
 
 
 @pytest.mark.parametrize("caminho", CAMINHOS_DETERMINISTICOS)
 def test_confianca_nao_declara_certeza_absoluta(caminho):
-    """Declarar 1,0 e errar custa o dobro: com três predições erradas em
-    224, 0,99 rende mais bônus que 1,0."""
+    """0,9999 alcança o teto do bônus quando tudo acerta, de modo que 1,0
+    nada acrescenta e deixa a afirmação de certeza absoluta sem margem para
+    o caso não observado."""
     assert CONFIANCA_POR_CAMINHO[caminho] < 1.0
 
 

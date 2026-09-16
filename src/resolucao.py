@@ -118,22 +118,36 @@ def buscar_candidatos(con: sqlite3.Connection, identificador: str) -> list[Candi
 # entre a confiança declarada e o acerto efetivo, de modo que rebaixá-la
 # abaixo da taxa medida custa tanto quanto exagerá-la.
 #
-# Todos os caminhos acertam integralmente o conjunto de referência, e o
-# valor que maximiza o bônus é 0,99: fica acima de 0,98 quando tudo acerta
-# e à frente de 1,00 quando três predições falham, porque declarar certeza
-# absoluta e errar custa o dobro. Os caminhos que dependem do modelo ou de
-# sinal indireto ficam abaixo disso, na proporção do que os separa de uma
-# decisão estrutural.
+# Os caminhos estruturais acertam integralmente as duas versões do conjunto
+# de referência, e declaram 0,9999. O valor foi medido sobre a métrica
+# oficial, variando a confiança de uma submissão perfeita e de submissões
+# com erro injetado:
+#
+#   erros em 192      0,99          0,9999
+#   ------------      ----------    ----------
+#   nenhum            1,0999900     1,1000000
+#   dois              1,0857492     1,0857385
+#   quarenta          0,7904143     0,7901114
+#
+# O ganho máximo é 0,00001 e a perda máxima 0,0003, contra os 0,0034 que uma
+# única citação mal classificada custa: a escolha vive duas ordens de
+# grandeza abaixo do que decide o resultado, e 0,9999 é preferido por
+# alcançar o teto quando o conjunto oculto se comporta como os conhecidos.
+# Declarar 1,00 não acrescenta nada, e deixa a afirmação de certeza absoluta
+# sem margem para o caso não observado.
+#
+# Os caminhos que dependem do modelo ou de sinal indireto ficam abaixo
+# disso, na proporção do que os separa de uma decisão estrutural.
 #
 # Dois caminhos podem partilhar o mesmo valor quando acertam na mesma
 # medida: é o caminho que a `Resolucao` carrega, não a confiança, que
 # identifica a origem da decisão.
 CONFIANCA_POR_CAMINHO = {
-    "normativo": 0.99,        # súmula ou artigo casado no índice normativo
-    "sem_identificador": 0.99,  # citação em prosa, sem número a resolver
-    "registro_unico": 0.99,   # um só registro do acervo contém o identificador
-    "sem_candidato": 0.99,    # nenhum registro contém o identificador
-    "cabecalho": 0.99,        # um só registro traz o identificador no cabeçalho
+    "normativo": 0.9999,      # súmula ou artigo casado no índice normativo
+    "sem_identificador": 0.9999,  # citação em prosa, sem número a resolver
+    "registro_unico": 0.9999,  # um só registro do acervo contém o identificador
+    "sem_candidato": 0.9999,  # nenhum registro contém o identificador
+    "cabecalho": 0.9999,      # um só registro traz o identificador no cabeçalho
     "especie": 0.95,          # o número consta do acervo na espécie citada
     "desempate": 0.90,        # vários registros, separados pelo modelo
     "so_mencionado": 0.90,    # o número só aparece citado, nunca como autuação
