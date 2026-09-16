@@ -22,10 +22,18 @@ _TERMO_JURISPRUDENCIAL = (
 )
 
 # A espécie do recurso, quando é ela que abre a citação.
+# A espécie do recurso substitui o tribunal como elemento que situa o
+# julgado: "Rcl de 2021, Rel. Min. Rosa Weber" identifica um acórdão sem
+# nomear a corte. A lista é de siglas correntes no processo brasileiro, e
+# não das que aparecem nestes documentos.
 _ESPECIE_DE_RECURSO = (
-    r"(?:Reclama[çc][ãa]o|Rcl|APL|Apela[çc][ãa]o|AgRg|AgInt|EDcl|RHC|RMS"
+    r"(?:Reclama[çc][ãa]o|Rcl|APL|Apela[çc][ãa]o|AgRg|AgInt|AgR|EDcl|ED"
+    r"|RHC|RMS|ROMS|HC|MS|RE|REsp|AREsp|ARE|RR|AIRR|ARR|RSE|RO|ROC"
+    r"|ADI|ADC|ADPF|ADO|CC|Pet|AC|AI|SL|SS|QO|EREsp|EDiv"
     r"|Agravo(?:\s+\w+){0,4}|Recurso(?:\s+\w+){0,4}"
-    r"|Habeas\s+Corpus|Mandado\s+de\s+Seguran[çc]a)"
+    r"|Habeas\s+Corpus|Mandado\s+de\s+Seguran[çc]a"
+    r"|A[çc][ãa]o\s+(?:Direta|Declarat[óo]ria|Rescis[óo]ria)(?:\s+\w+){0,3}"
+    r"|Conflito\s+de\s+Compet[êe]ncia|Peti[çc][ãa]o|Suspens[ãa]o(?:\s+\w+){0,4})"
 )
 
 _TRIBUNAL = (
@@ -33,6 +41,10 @@ _TRIBUNAL = (
     r"|Supremo Tribunal Federal|Superior Tribunal de Justi[çc]a"
     r"|Tribunal Superior do Trabalho|Tribunal Superior Eleitoral"
     r"|Superior Tribunal Militar"
+    # os regionais nomeiam a região por extenso: "TRT da 2ª Região"
+    r"|Tribunal Regional (?:Federal|do Trabalho|Eleitoral)"
+    r"(?:\s+d[ae]\s+\d{1,2}[ªa]?\s+Regi[ãa]o)?"
+    r"|TR[FTE]\s+d[ae]\s+\d{1,2}[ªa]?\s+Regi[ãa]o"
     r"|Tribunal de Justi[çc]a(?:\s+d[eo]\s+[A-ZÀ-Ý][\wÀ-ÿ]*){0,3})"
 )
 
@@ -59,9 +71,13 @@ _DE = r"d[ceo]"
 _ANO = r"(?:19|20)\d{2}"
 _LIGACAO = r"(?:d[oaes]|pel[oa])s?"
 
+# Quem conduziu o julgamento, nomeado por relatoria, por lavra, por
+# relato ou pela abreviatura que antecede o nome.
 _RELATOR = (
-    rf"(?:(?:pela|sob|d[ao]|{_DE})\s+relatoria\s+(?:{_DE}|d[ao])?\s*{_NOME}"
-    rf"|Rel(?:at[oa]r[a]?)?\.?\s*(?:Min(?:istr[oa])?\.?)?\s*{_NOME})"
+    rf"(?:(?:pela|sob|d[ao]|{_DE})\s+(?:relatoria|lavra)\s+(?:{_DE}|d[ao])?\s*"
+    rf"(?:Min(?:istr[oa])?\.?|Des(?:embargador[a]?)?\.?)?\s*{_NOME}"
+    rf"|relatad[oa]\s+pel[oa]\s+(?:Min(?:istr[oa])?\.?|Des(?:embargador[a]?)?\.?)?\s*{_NOME}"
+    rf"|Rel(?:at[oa]r[a]?)?\.?\s*(?:Min(?:istr[oa])?\.?|Des(?:embargador[a]?)?\.?)?\s*{_NOME})"
 )
 
 # Entre o órgão e o ano cabe um particípio ("proferido", "julgado"), que a

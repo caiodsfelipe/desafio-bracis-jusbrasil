@@ -154,3 +154,37 @@ def test_identificador_legitimo_sobrevive_ao_filtro(texto, esperado):
     from normalizacao import normalizar_identificadores
 
     assert normalizar_identificadores(texto) == esperado
+
+
+@pytest.mark.parametrize(
+    "texto",
+    [
+        "acórdão do TRF3 de 2022, Rel. Des. Ana Costa",
+        "julgado do Tribunal Regional Federal da 3ª Região de 2020, Rel. Des. Silva",
+        "acórdão proferido pelo TRT da 2ª Região em 2021",
+        "aresto do TST de 2018, da lavra do Ministro Vieira",
+        "decisão monocrática do STJ de 2020, Rel. Min. Og Fernandes",
+        "precedente da Terceira Seção do STJ, de 2019, Rel. Min. Reynaldo",
+    ],
+)
+def test_orgao_nomeado_de_formas_diversas(texto):
+    """O regional aparece por sigla ou por extenso, e o relator vem por
+    relatoria, por lavra ou pela abreviatura."""
+    assert _trecho(texto, extrair_em_prosa) == texto
+
+
+@pytest.mark.parametrize(
+    "texto",
+    [
+        "ADI de 2021, Rel. Min. Fux",
+        "ADPF de 2019, Rel. Min. Barroso",
+        "HC de 2020, Rel. Min. Vaz",
+        "CC de 2022, Rel. Min. Nancy",
+        "RHC de 2020, Rel. Min. Laurita Vaz",
+        "EDcl de 2022, Rel. Min. Nancy Andrighi",
+    ],
+)
+def test_especie_substitui_o_tribunal(texto):
+    """O gabarito trata "Rcl de 2021, Rel. Min. Rosa Weber" como citação: a
+    espécie do recurso situa o julgado quando a corte não é nomeada."""
+    assert _trecho(texto, extrair_em_prosa) == texto

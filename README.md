@@ -138,6 +138,7 @@ notebook_kaggle.py         célula única que gera submission.csv no Kaggle
 avaliar.py                 avaliação reprodutível contra o conjunto de referência
 robustez.py                score sob perturbação dos documentos
 generalizacao.py           desempenho por documento, para expor ajuste excessivo
+contraprova.py             avaliação contra uma base diferente da instalada
 comparar.py                diferença de comportamento contra uma versão anterior
 ```
 
@@ -199,6 +200,26 @@ revisão do melhor resultado conhecido:
 ```bash
 python comparar.py v1.0.0
 ```
+
+### A contraprova de duas bases
+
+A organização publicou duas versões do dataset, e a diferença entre elas é
+a melhor prova de generalização disponível. Medido com `contraprova.py`:
+
+| código | base anterior | base final |
+|---|---|---|
+| antes do ajuste | 0,9924 | 0,9759 |
+| **depois** | **1,0819** | **1,0999** |
+
+A versão anterior marcava 1,09803 no leaderboard e não passava de 0,99 em
+nenhuma das duas bases reais. A diferença vinha de um gabarito que ela
+própria havia inferido: 29 citações reconstruídas a partir de lacunas na
+numeração, nenhuma das quais existe. As lacunas eram remoções deliberadas.
+
+A lição ficou no método: uma hipótese sobre o gabarito que o próprio
+sistema usa para se medir não é verificável, e o leaderboard da fase de
+treino a recompensava. O que restou como medida honesta é pontuar bem em
+bases que não foram usadas para escrever as regras.
 
 `generalizacao.py` avalia cada documento isoladamente e compara com o
 conjunto inteiro. Uma parte que caia muito abaixo da referência indicaria
