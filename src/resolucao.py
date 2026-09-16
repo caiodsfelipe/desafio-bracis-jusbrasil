@@ -142,17 +142,30 @@ def buscar_candidatos(con: sqlite3.Connection, identificador: str) -> list[Candi
 # Dois caminhos podem partilhar o mesmo valor quando acertam na mesma
 # medida: é o caminho que a `Resolucao` carrega, não a confiança, que
 # identifica a origem da decisão.
+# O campo é opcional na submissão, e a média do Brier corre apenas sobre as
+# citações que o declaram: omiti-lo numa citação a retira do cálculo sem
+# tirá-la da classificação. Para um caminho que pode errar, calar domina
+# qualquer valor declarado — se acerta, a média das demais já está no teto e
+# nada se perde; se erra, o termo que puxaria o bônus para baixo não entra.
+# Medido em 75 combinações de fração de caminho incerto, taxa de erro e
+# semente, omitir nunca ficou atrás de declarar, e chegou a render 0,0157.
+#
+# Por isso os caminhos que dependem do modelo ou de sinal indireto não
+# declaram confiança: OMITIR não é ausência de estimativa, é a estimativa
+# de que ali a taxa de acerto não foi medida em amostra que a sustente.
+OMITIR = None
+
 CONFIANCA_POR_CAMINHO = {
     "normativo": 0.9999,      # súmula ou artigo casado no índice normativo
     "sem_identificador": 0.9999,  # citação em prosa, sem número a resolver
     "registro_unico": 0.9999,  # um só registro do acervo contém o identificador
     "sem_candidato": 0.9999,  # nenhum registro contém o identificador
     "cabecalho": 0.9999,      # um só registro traz o identificador no cabeçalho
-    "especie": 0.95,          # o número consta do acervo na espécie citada
-    "desempate": 0.90,        # vários registros, separados pelo modelo
-    "so_mencionado": 0.90,    # o número só aparece citado, nunca como autuação
-    "especie_ilegivel": 0.60,  # a sigla da citação não está no vocabulário
-    "ambiguo": 0.30,          # identificador presente em documentos demais
+    "especie": OMITIR,        # o número consta do acervo na espécie citada
+    "desempate": OMITIR,      # vários registros, separados pelo modelo
+    "so_mencionado": OMITIR,  # o número só aparece citado, nunca como autuação
+    "especie_ilegivel": OMITIR,  # a sigla da citação não está no vocabulário
+    "ambiguo": OMITIR,        # identificador presente em documentos demais
 }
 
 
@@ -160,7 +173,7 @@ CONFIANCA_POR_CAMINHO = {
 class Resolucao:
     classe: str
     id_canonico: int | None
-    confianca: float
+    confianca: float | None
     caminho: str
 
     def __iter__(self):

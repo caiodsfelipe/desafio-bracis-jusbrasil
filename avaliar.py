@@ -75,9 +75,14 @@ def _celula_da_predicao(candidatos, resolucoes):
     partes = []
     for candidato, resolucao in zip(candidatos, resolucoes, strict=True):
         id_canonico = str(resolucao.id_canonico) if resolucao.id_canonico else "-"
+        # A confiança é opcional, e o caminho que não a declara fica fora da
+        # média do Brier em vez de puxá-la para baixo.
+        confianca = (
+            "-" if resolucao.confianca is None else f"{resolucao.confianca:.4f}"
+        )
         partes.append(
             f"{candidato.inicio},{candidato.fim},{resolucao.classe},"
-            f"{id_canonico},{resolucao.confianca:.4f}"
+            f"{id_canonico},{confianca}"
         )
     return "|".join(partes) or "-"
 

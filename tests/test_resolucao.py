@@ -108,11 +108,21 @@ def test_confianca_nao_declara_certeza_absoluta(caminho):
     assert CONFIANCA_POR_CAMINHO[caminho] < 1.0
 
 
-def test_caminhos_dependentes_de_sinal_indireto_declaram_menos():
+def test_caminhos_dependentes_de_sinal_indireto_nao_declaram_confianca():
     """A espécie do recurso e a escolha do modelo são sinais mais frágeis
-    que a posição do número no cabeçalho."""
-    for caminho in ("especie", "desempate", "so_mencionado"):
-        assert CONFIANCA_POR_CAMINHO[caminho] < CONFIANCA_POR_CAMINHO["cabecalho"]
+    que a posição do número no cabeçalho, e o campo é opcional: a média do
+    Brier corre só sobre quem declara, de modo que calar retira a citação
+    do cálculo sem tirá-la da classificação. Em 75 combinações de fração de
+    caminho incerto, taxa de erro e semente, omitir nunca ficou atrás de
+    declarar um valor, e chegou a render 0,0157."""
+    for caminho in (
+        "especie",
+        "desempate",
+        "so_mencionado",
+        "especie_ilegivel",
+        "ambiguo",
+    ):
+        assert CONFIANCA_POR_CAMINHO[caminho] is None
 
 
 def test_resolucao_carrega_o_caminho_que_a_produziu():

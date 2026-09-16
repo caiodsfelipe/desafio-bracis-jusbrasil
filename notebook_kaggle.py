@@ -33,7 +33,8 @@ for nome in documentos:
     resolucoes = resolver_citacoes(con, qwen, indice, candidatos) if candidatos else []
     partes = [
         f"{c.inicio},{c.fim},{r.classe},"
-        f"{str(r.id_canonico) if r.id_canonico else '-'},{r.confianca:.4f}"
+        f"{str(r.id_canonico) if r.id_canonico else '-'},"
+        f"{'-' if r.confianca is None else format(r.confianca, '.4f')}"
         for c, r in zip(candidatos, resolucoes)
     ]
     linhas.append((nome, "|".join(partes) or "-"))
