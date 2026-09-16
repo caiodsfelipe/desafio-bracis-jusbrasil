@@ -11,13 +11,34 @@ import re
 # O nome do recurso encadeia palavras em maiúscula ligadas por preposições
 # e pela conjunção, como em "Suspensão de Liminar e de Sentença".
 _CONECTORES = r"(?:em|no|na|nos|nas|de|da|do|das|dos|e)"
+
+# A palavra capitalizada que abre o período tem a forma de nome de recurso,
+# mas introduz a citação em vez de pertencer a ela: em "Também na Reclamação
+# nº 33.125" a citação começa em "Reclamação". Três propriedades separam o
+# introdutor do nome do recurso, e nenhuma delas enumera vocabulário:
+#
+#   o artigo definido antecede o nome do recurso, nunca o compõe;
+#   o verbo em próclise ou ênclise ("Confira-se", "Registre-se") é oração,
+#   e nome de recurso não conjuga;
+#   o advérbio de articulação termina em -mente.
+#
+# O que sobra é a lista curta dos articuladores que não têm marca formal.
+_ARTIGO_DEFINIDO = r"[AOao]s?"
+_VERBO_COM_PRONOME = r"[A-ZÀ-Ý][a-zà-ÿ]+-(?:se|o|a|os|as|lhe|lhes|nos)"
+_ADVERBIO_EM_MENTE = r"[A-ZÀ-Ý][a-zà-ÿ]+mente"
+_ARTICULADORES = (
+    r"Tamb[ée]m|Ainda|Assim|Ademais|Outrossim|Contudo|Todavia|Entretanto"
+    r"|Por[ée]m|Portanto|Logo|Destarte|Conforme|Consoante|Segundo|Vide|Cf"
+    r"|Como|Quando|Embora|Conquanto|Apesar|Sobre|Quanto|Acerca|Nesse|Neste"
+    r"|Naquele|Nessa|Nesta|Daquele|Desse|Deste|Al[ée]m|Al[íi]s|Ali[áa]s"
+)
+_ABERTURA_DE_PERIODO = (
+    rf"(?:{_ARTIGO_DEFINIDO}|{_VERBO_COM_PRONOME}|{_ADVERBIO_EM_MENTE}"
+    rf"|(?:{_ARTICULADORES}))"
+)
 # O "N" de "Nº" pertence ao conector do número, não ao nome do recurso.
-# O advérbio que abre a frase tem forma de nome de recurso, mas introduz a
-# citação em vez de fazer parte dela: em "Também na Reclamação nº 33.125" a
-# citação começa em "Reclamação".
-_ADVERBIOS_DE_ABERTURA = r"Tamb[ée]m|Ainda|Assim|Ademais|Outrossim|Igualmente"
 _TOKEN_MAIUSCULO = (
-    rf"(?!N[º°](?!\w))(?!(?:{_ADVERBIOS_DE_ABERTURA})\b)[A-ZÀ-Ý][A-Za-zÀ-ÿ.\-]*"
+    rf"(?!N[º°](?!\w))(?!{_ABERTURA_DE_PERIODO}\b)[A-ZÀ-Ý][A-Za-zÀ-ÿ.\-]*"
 )
 
 # A palavra "processo" antecede o número como parte da designação do feito,
@@ -98,20 +119,44 @@ _PADRAO_ARTIGO = re.compile(
 # Executivo têm a forma de citação, e o rótulo que os antecede é o que os
 # distingue. A lista descreve o que nunca é jurisprudência, e por isso não
 # depende de quais espécies de recurso aparecem no documento.
-_ROTULOS_NAO_JURISPRUDENCIAIS = (
+_ROTULOS_CADASTRAIS = (
     r"CNPJ|CPF|RG|PIS|PASEP|CEP|NIT|CTPS"
     r"|[Pp]rotocolo|OAB|[Mm]atr[íi]cula|[Ii]nscri[çc][ãa]o"
     r"|[Pp]ortaria|[Dd]ecreto|[Rr]esolu[çc][ãa]o|[Ii]nstru[çc][ãa]o\s+[Nn]ormativa"
     r"|[Oo]f[íi]cio|[Cc]ircular|[Nn]ota\s+[Tt][ée]cnica|[Ee]dital"
     r"|[Cc]ontrato|[Aa]p[óo]lice|[Bb]oleto|[Nn]ota\s+[Ff]iscal"
 )
-_PADRAO_ROTULO_NAO_JURISPRUDENCIAL = re.compile(
-    rf"(?:{_ROTULOS_NAO_JURISPRUDENCIAIS})\b[\s/º°.:nN-]*$"
+
+# O veículo de publicação acompanha o acórdão citado e datava sua
+# divulgação: em "REsp 1.234.567/SP, DJe de 21/9/2023" a citação é o
+# recurso, e a data é o registro de sua publicação. Sem esta distinção o
+# diário vira uma segunda citação, que nenhum registro do acervo contém e
+# que a resolução dá por inventada com alta confiança.
+_VEICULOS_DE_PUBLICACAO = r"DJ|DJe|DJE|DEJT|DOU|DOE|LEXSTJ|RTJ|RSTJ"
+
+# A peça eletrônica numera suas próprias folhas e anexos. "Evento 17" e
+# "ID 61582938" localizam uma peça dentro dos autos em curso, não um
+# julgado de outro processo.
+_ROTULOS_DE_AUTOS = (
+    r"[Ee]vento|ID|[Ss]eq|[Ff]ls?|[Ff]olhas?|[Aa]nexo|[Dd]oc"
+    r"|[Mm]ov|[Pp][áa]g(?:ina)?"
 )
-# O padrão de citação pode ter começado num artigo antes do rótulo, como em
-# "O Protocolo nº 2023.1475691".
+
+_ROTULOS_NAO_JURISPRUDENCIAIS = (
+    rf"{_ROTULOS_CADASTRAIS}|{_VEICULOS_DE_PUBLICACAO}|{_ROTULOS_DE_AUTOS}"
+)
+# Entre o rótulo e o número cabem o indicador de número, a pontuação e a
+# preposição que datam a publicação: "DJe de 14/3/2024", "Protocolo nº
+# 2023.1475691", "fls. 45".
+_LIGACAO_ROTULO_NUMERO = r"(?:[\s/º°.:nN-]|\bde\b|\bem\b)*"
+_PADRAO_ROTULO_NAO_JURISPRUDENCIAL = re.compile(
+    rf"(?:{_ROTULOS_NAO_JURISPRUDENCIAIS})\b{_LIGACAO_ROTULO_NUMERO}$"
+)
+# O padrão pode ter aberto o trecho antes do rótulo, num artigo ou num
+# verbo, como em "O Protocolo nº 2023.1475691" e "Consta do Evento 17".
+# O que decide é o rótulo colado ao número, em qualquer ponto do trecho.
 _PADRAO_ROTULO_NO_TRECHO = re.compile(
-    rf"^(?:[AaOo]s?\s+)?(?:{_ROTULOS_NAO_JURISPRUDENCIAIS})\b"
+    rf"(?:^|\b)(?:{_ROTULOS_NAO_JURISPRUDENCIAIS})\b{_LIGACAO_ROTULO_NUMERO}\d"
 )
 
 # Um ano precedido de preposição encerra uma citação em prosa, não um

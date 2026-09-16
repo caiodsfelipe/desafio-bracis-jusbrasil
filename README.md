@@ -139,6 +139,8 @@ avaliar.py                 avaliação reprodutível contra o conjunto de refer�
 robustez.py                score sob perturbação dos documentos
 generalizacao.py           desempenho por documento, para expor ajuste excessivo
 contraprova.py             avaliação contra uma base diferente da instalada
+ablacao.py                 valor de cada regra nas duas bases, para expor assimetria
+corpus.py                  auditoria dos padrões contra os acórdãos reais do acervo
 comparar.py                diferença de comportamento contra uma versão anterior
 ```
 
@@ -183,6 +185,10 @@ pytest tests/                    # suíte de regressão, roda em milissegundos
 python avaliar.py                # avaliação determinística, sem carregar o modelo
 python avaliar.py --com-modelo   # pipeline completo, requer GPU
 python robustez.py               # score sob perturbação dos documentos
+python generalizacao.py          # desempenho documento a documento
+python corpus.py                 # forma dos trechos nos acórdãos reais do acervo
+python contraprova.py <base>     # score contra outra versão do conjunto
+python ablacao.py --base-antiga <base>   # valor de cada regra nas duas bases
 ```
 
 `avaliar.py` imprime o score por nível, a cobertura da extração e o acerto por
@@ -233,11 +239,62 @@ avaliação cego, cujo ruído não está no conjunto de referência:
 
 | Perturbação | Score |
 |---|---|
-| nenhuma | 1.0863 |
-| ruído de digitalização em 2% dos algarismos | 1.0657 |
-| ponto de milhar entregue como espaço | 1.0721 |
-| indicador de número com o outro sinal de grau | 1.0863 |
-| travessão no lugar do hífen | 1.0863 |
+| nenhuma | 1.0999 |
+| ruído de digitalização em 2% dos algarismos | 1.0879 |
+| ponto de milhar entregue como espaço | 1.0746 |
+| indicador de número com o outro sinal de grau | 1.0999 |
+| travessão no lugar do hífen | 1.0999 |
+
+### Ablação: o que cada regra vale nas duas bases
+
+Uma regra que capturou o critério do desafio vale o mesmo nas duas versões
+publicadas; uma ajustada à amostra vale muito numa e pouco na outra.
+`ablacao.py` desativa cada regra e compara as duas quedas:
+
+| Regra desativada | Queda (final) | Queda (anterior) | Assimetria |
+|---|---|---|---|
+| citação com identificador | 0,4205 | 0,4171 | 0,0034 |
+| prosa: termo jurisprudencial | 0,1588 | 0,1550 | 0,0037 |
+| artigo de lei | 0,1175 | 0,1160 | 0,0015 |
+| prosa: espécie e órgão | 0,0509 | 0,0506 | 0,0003 |
+| prosa: espécie e ano | 0,0324 | 0,0322 | 0,0002 |
+| tema de repercussão | 0,0076 | 0,0076 | 0,0000 |
+| súmula | 0,0028 | 0,0029 | 0,0001 |
+| filtro de número administrativo | 0,0000 | 0,0000 | 0,0000 |
+
+A assimetria máxima é 0,0037 contra uma queda de até 0,42: nenhuma regra
+depende de qual versão do conjunto a mede. O filtro de número
+administrativo cai a zero porque nenhuma das bases o exercita, e mesmo
+assim descarta cinco inscrições da OAB e quatro falsos positivos num
+documento adversarial; é defesa, não código morto.
+
+### Auditoria contra os acórdãos reais
+
+Os 26 documentos de referência são pareceres redigidos para o desafio; os
+1014 acórdãos do acervo são peças reais dos cinco tribunais, e nenhuma
+regra foi escrita olhando para eles. `corpus.py` mede a forma dos trechos
+capturados ali, e foi o que expôs duas classes que os pareceres não
+exercitam porque pertencem ao outro gênero textual:
+
+| Classe | Exemplo | Custo medido |
+|---|---|---|
+| veículo de publicação | `DJe de 14/3/2024`, `DEJT 03/02/2012` | 0,045 a 0,108 |
+| referência de autos | `Evento 17`, `ID 61582938`, `fls. 45` | 0,166 |
+
+As duas juntas custavam 0,2555, injetadas nos 26 documentos. Ambas têm a
+forma de identificador sem apontar julgado algum, e a resolução as dava por
+inventadas com confiança 0,99, que é o pior tipo de falso positivo para a
+métrica. Depois do filtro, os trechos abertos por rótulo indevido caíram de
+cerca de 4.000 para 5 em 22.577 (0,022%), e o score das duas bases não se
+moveu.
+
+A mesma auditoria mostrou que o artigo definido em início de período
+(`O AgInt no AREsp 123456/SP`) entrava no span. Em 121 das 192 citações do
+gabarito há um artigo colado ao span e nenhuma o inclui; com identificador
+curto o excedente derruba a sobreposição abaixo de 0,5 e a citação é
+contada como perdida. A distinção agora é morfológica, não enumerada: o
+artigo, o verbo com pronome (`Registre-se`) e o advérbio em `-mente`
+introduzem a citação sem pertencer a ela.
 
 Requer GPU para o pipeline completo. Em bfloat16 o modelo ocupa cerca de
 16.4 GB; no Kaggle (T4 ×2) é distribuído entre as duas GPUs com

@@ -87,13 +87,79 @@ def test_numero_administrativo_nao_e_citacao(texto):
 @pytest.mark.parametrize(
     "texto",
     [
-        "A Reclamação nº 66.516/RO",
-        "O Recurso Especial nº 1.377.019/SP",
-        "O Agravo Interno na Suspensão de Liminar nº 2.883/MA",
+        "DJe de 14/3/2024",
+        "Publicado no DJe em 5/12/2003",
+        "DEJT 03/02/2012",
+        "DJ de 3/6/1994",
+        "Consta do Evento 17",
+        "ID 61582938",
+        "Conforme fls. 45",
+        "o doc. 12 juntado",
+        "mov. 88 dos autos",
     ],
 )
-def test_artigo_antes_do_recurso_nao_bloqueia_a_citacao(texto):
-    assert texto in trechos(texto)
+def test_publicacao_e_referencia_de_autos_nao_sao_citacao(texto):
+    """O diário que publicou o acórdão e a peça numerada dentro dos autos
+    têm a forma de identificador sem apontar julgado algum. Nenhum registro
+    do acervo os contém, e sem este filtro a resolução os daria por
+    inventados com alta confiança."""
+    assert trechos(texto) == []
+
+
+@pytest.mark.parametrize(
+    ("texto", "esperado"),
+    [
+        ("Rcl 45678/DF, Rel. Min. Fulano, DJe de 14/3/2024", "Rcl 45678/DF"),
+        ("REsp 1.234.567/SP, DJe 21/9/2023", "REsp 1.234.567/SP"),
+        ("AgInt no AREsp 998877/RJ (DEJT 03/02/2012)", "AgInt no AREsp 998877/RJ"),
+    ],
+)
+def test_publicacao_nao_apaga_a_citacao_que_acompanha(texto, esperado):
+    """A data de publicação acompanha o acórdão citado: o julgado continua
+    sendo citação, e só o veículo fica de fora."""
+    assert esperado in trechos(texto)
+
+
+@pytest.mark.parametrize(
+    ("texto", "esperado"),
+    [
+        ("A Reclamação nº 66.516/RO", "Reclamação nº 66.516/RO"),
+        ("O Recurso Especial nº 1.377.019/SP", "Recurso Especial nº 1.377.019/SP"),
+        (
+            "O Agravo Interno na Suspensão de Liminar nº 2.883/MA",
+            "Agravo Interno na Suspensão de Liminar nº 2.883/MA",
+        ),
+        ("Os EDcl no REsp 1.234.567/SP", "EDcl no REsp 1.234.567/SP"),
+    ],
+)
+def test_artigo_antes_do_recurso_fica_fora_do_span(texto, esperado):
+    """O artigo definido antecede o nome do recurso sem compô-lo: em 121 das
+    192 citações do conjunto de referência há um artigo colado ao span, e
+    nenhuma o inclui. Em início de período ele vem em maiúscula, e sem essa
+    distinção entraria na citação."""
+    assert esperado in trechos(texto)
+
+
+@pytest.mark.parametrize(
+    "texto",
+    [
+        "Conforme Rcl 45678/DF, a tese se firmou.",
+        "Registre-se RE 1234/SP como precedente.",
+        "Evidentemente HC 321/BA se aplica.",
+        "Todavia AI 87/RS foi rejeitado.",
+    ],
+)
+def test_palavra_que_abre_o_periodo_fica_fora_do_span(texto):
+    """O articulador, o verbo com pronome e o advérbio em -mente introduzem a
+    citação sem pertencer a ela. Em identificador curto o excedente derruba a
+    sobreposição abaixo do limite de 0,5 e a citação é contada como perdida."""
+    assert trechos(texto)
+    assert all(not t[0].islower() and " " in t for t in trechos(texto))
+    assert not any(
+        t.startswith(p)
+        for t in trechos(texto)
+        for p in ("Conforme", "Registre-se", "Evidentemente", "Todavia")
+    )
 
 
 @pytest.mark.parametrize(
