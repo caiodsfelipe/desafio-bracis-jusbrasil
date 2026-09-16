@@ -11,6 +11,7 @@ necessariamente fora delas: medido sobre o mesmo conjunto que a avaliação
 oficial usa, a etapa custava 0,079 do score, porque um candidato espúrio
 por documento tira 0,096 e não havia recall a ganhar.
 """
+import re
 from dataclasses import dataclass
 
 from regex_extracao import extrair_candidatos as extrair_por_regex
@@ -33,17 +34,69 @@ class CandidatoCitacao:
 # das partes e inscrição na OAB, concentra números que têm a forma de
 # citação sem serem citação: os autos do próprio documento, protocolo,
 # valor da causa. A primeira citação de fato só aparece depois da abertura.
-_FIM_DO_PREAMBULO = 400
+#
+# O que delimita o preâmbulo é a forma, não a posição: ele é uma sequência
+# de linhas curtas, cada uma um rótulo de qualificação ou um título, e
+# termina na primeira linha de prosa corrida. Medir por posição fixa
+# funcionaria apenas para peças de abertura tão longa quanto as
+# observadas: nestas a primeira citação aparece no caractere 460, e um
+# endereçamento cem caracteres mais enxuto já faria o corte engolir
+# citação legítima.
+_LARGURA_DE_PROSA = 90
+_ROTULO_DE_QUALIFICACAO = re.compile(
+    r"^\s*(?:[A-ZÀ-Ý][\wÀ-ÿ.\- ]{0,30}:"
+    r"|Autos|Processos?|Protocolo|Apelante|Apelad[oa]|Recorrente|Recorrid[oa]"
+    r"|Impetrante|Impetrad[oa]|Embargante|Embargad[oa]|Agravante|Agravad[oa]"
+    r"|Requerente|Requerid[oa]|Interessad[oa]|Relator[a]?|Sess[ãa]o|Origem)\b"
+)
+# Nenhuma peça observada abre o corpo depois deste ponto, e além dele o
+# corte deixa de proteger: serve de limite para o caso de um documento sem
+# nenhuma linha de prosa reconhecível.
+_MAXIMO_DO_PREAMBULO = 2000
+
+
+# O timbre do órgão vem em caixa alta, e uma linha assim é cabeçalho por
+# mais larga que seja. A prosa traz minúsculas em proporção.
+_MINIMO_DE_MINUSCULAS = 0.5
+
+
+def _e_prosa(linha: str) -> bool:
+    """A linha é prosa corrida, e não rótulo nem timbre do órgão."""
+    if len(linha) < _LARGURA_DE_PROSA or _ROTULO_DE_QUALIFICACAO.match(linha):
+        return False
+    letras = [c for c in linha if c.isalpha()]
+    if not letras:
+        return False
+    minusculas = sum(1 for c in letras if c.islower())
+    return minusculas / len(letras) >= _MINIMO_DE_MINUSCULAS
+
+
+def _fim_do_preambulo(texto: str) -> int:
+    """Posição em que o corpo da peça começa.
+
+    O corpo é a primeira linha de prosa corrida: larga o bastante para não
+    ser rótulo, sem o rótulo de qualificação que marca as linhas do
+    cabeçalho, e em caixa mista, que distingue a prosa do timbre.
+    """
+    posicao = 0
+    for linha in texto.split("\n"):
+        if posicao >= _MAXIMO_DO_PREAMBULO:
+            return _MAXIMO_DO_PREAMBULO
+        if _e_prosa(linha):
+            return posicao
+        posicao += len(linha) + 1
+    return 0
 
 
 def _candidatos_dos_padroes(texto: str) -> list[CandidatoCitacao]:
     """Citações delimitadas por padrão: as que trazem identificador e as
     que descrevem o julgado por tribunal, ano e relator."""
     achados = extrair_por_regex(texto) + extrair_prosa_por_regex(texto)
+    fim_do_preambulo = _fim_do_preambulo(texto)
     return [
         CandidatoCitacao(inicio=inicio, fim=fim, trecho=trecho, origem="padrao")
         for inicio, fim, trecho in achados
-        if inicio >= _FIM_DO_PREAMBULO
+        if inicio >= fim_do_preambulo
     ]
 
 

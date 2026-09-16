@@ -188,3 +188,55 @@ def test_especie_substitui_o_tribunal(texto):
     """O gabarito trata "Rcl de 2021, Rel. Min. Rosa Weber" como citação: a
     espécie do recurso situa o julgado quando a corte não é nomeada."""
     assert _trecho(texto, extrair_em_prosa) == texto
+
+
+_CORPO = (
+    "A questão de fundo comporta solução singela e merece análise detida, "
+    "conforme se demonstra nas linhas que seguem adiante neste parecer.\n"
+    "Veja-se o REsp 6.989.916/RS, que ilustra a orientação dominante."
+)
+
+
+@pytest.mark.parametrize(
+    "preambulo",
+    [
+        "",
+        "MEMORIAL\n\nProcesso nº 0252874-23.2020.3.18.6580\n\n",
+        "PARECER\n\nAutos nº 9293337-24.2018.7.15.8725\n"
+        "Apelante: TRANSPORTES MARAJÓ EIRELI\nApelado: Ministério Público\n\n",
+        "PODER JUDICIÁRIO\nTRIBUNAL REGIONAL DO TRABALHO\n"
+        "GABINETE DO DESEMBARGADOR\n\nAutos nº 1234567-89.2020.5.02.0001\n"
+        "Recorrente: EMPRESA X LTDA\nAdvogado: OAB/SP 193771\n"
+        "Protocolo nº 2023.1475691\n\n",
+        "SUPERIOR TRIBUNAL DE JUSTIÇA GABINETE DO EXCELENTÍSSIMO SENHOR "
+        "MINISTRO RELATOR DA TERCEIRA TURMA\nAutos nº 1234567-89.2020.5.02.0001\n\n",
+    ],
+)
+def test_citacao_sobrevive_a_preambulo_de_qualquer_tamanho(preambulo):
+    """O preâmbulo é delimitado pela forma, não pela posição: um
+    endereçamento mais enxuto que os observados não pode fazer o corte
+    engolir a primeira citação. Medido por posição fixa, um preâmbulo cem
+    caracteres mais curto já custava 0,014 do score."""
+    from extracao import extrair_todos
+
+    trechos = [o.trecho for o in extrair_todos(preambulo + _CORPO)]
+    assert "REsp 6.989.916/RS" in trechos
+
+
+@pytest.mark.parametrize(
+    ("linha", "numero"),
+    [
+        ("Autos nº 9293337-24.2018.7.15.8725", "9293337"),
+        ("Processo nº 0252874-23.2020.3.18.6580", "0252874"),
+        ("Protocolo nº 2023.1475691", "2023"),
+        ("Advogado: OAB/SP 193771", "193771"),
+    ],
+)
+def test_qualificacao_do_proprio_feito_nao_e_citacao(linha, numero):
+    """Os autos do próprio documento, o protocolo e a inscrição do
+    advogado têm a forma de citação; ficam no preâmbulo e não são
+    extraídos."""
+    from extracao import extrair_todos
+
+    trechos = [o.trecho for o in extrair_todos(f"MEMORIAL\n\n{linha}\n\n{_CORPO}")]
+    assert not any(numero in t for t in trechos)
