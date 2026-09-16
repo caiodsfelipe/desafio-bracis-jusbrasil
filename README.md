@@ -288,6 +288,29 @@ métrica. Depois do filtro, os trechos abertos por rótulo indevido caíram de
 cerca de 4.000 para 5 em 22.577 (0,022%), e o score das duas bases não se
 moveu.
 
+A auditoria do fim do span expôs um terceiro defeito, esse com efeito na
+classificação e não só na delimitação. O span do dispositivo parava no nome
+do diploma quando o indicador de número estava ausente ou vinha em grafia
+diferente da usual:
+
+| Texto | Span antes | Span agora |
+|---|---|---|
+| `art. 31 da Lei 8.212/1993` | `art. 31 da Lei` | completo |
+| `art. 1º da LC nº 64/90` | `art. 1º da LC` | completo |
+| `art. 39 da Lei n.º 8.177/1991` | `art. 39 da Lei` | completo |
+| `art. 4º do Decreto- Lei 4.657/42` | `art. 4º do Decreto` | completo |
+
+O número identifica o diploma, e o índice normativo é chaveado por
+`("artigo", número, diploma)`: `art. 1º, I, 'g', da Lei Complementar nº
+64/1990` resolve para `real` com `id_canonico` 11304039, ao passo que o
+mesmo trecho truncado resolve para `inventada`. É a troca que a métrica
+pune com γ=0,5, e o IoU não a revela, porque o span truncado ainda
+ultrapassa 0,5. Nas duas bases o defeito não aparecia porque todos os
+dispositivos citados trazem o indicador `nº` na grafia usual.
+
+Nos acórdãos do acervo, spans truncados no nome do diploma caíram de 730
+para 16 em cerca de 39.000 trechos.
+
 A mesma auditoria mostrou que o artigo definido em início de período
 (`O AgInt no AREsp 123456/SP`) entrava no span. Em 121 das 192 citações do
 gabarito há um artigo colado ao span e nenhuma o inclui; com identificador

@@ -100,13 +100,22 @@ _INCISOS = r"(?:\s*,\s*(?:[IVXLC]+|[a-z]|§\s*\d+[º°]?(?:-[A-Z])?|'[a-z]'|\"[a
 # O nome do diploma começa em maiúscula ou é uma sigla, e admite
 # conectores em minúscula e quebra de linha adiante.
 _PALAVRA_DIPLOMA = r"(?:[A-ZÀ-Ý][a-zà-ÿ]+|d[aeo]s?|e)"
-_DIPLOMA = (
-    r"(?:[A-ZÀ-Ý]{2,}"                                   # sigla: CPC, CLT, CDC
-    rf"|[A-ZÀ-Ý][a-zà-ÿ]+(?:\s+{_PALAVRA_DIPLOMA}){{0,5}}"  # ou nome por extenso
-    # e eventual "nº 9.504/1997": o número termina em algarismo, para que o
-    # ponto que encerra a frase fique de fora do span
-    r"(?:\s*n[º°.]?\s*\d[\d./-]*\d)?)"
+# O nome do diploma: uma sigla ("CPC", "CLT", "LC") ou o nome por extenso.
+# O hífen de "Decreto-Lei" aparece com a segunda palavra em qualquer caixa e
+# às vezes com espaço adiante, como a digitalização o entrega.
+_NOME_DO_DIPLOMA = (
+    r"(?:[A-ZÀ-Ý]{2,}"
+    rf"|[A-ZÀ-Ý][a-zà-ÿ]+(?:\s*-\s*[A-Za-zÀ-ÿ][a-zà-ÿ]+)?"
+    rf"(?:\s+{_PALAVRA_DIPLOMA}){{0,5}})"
 )
+# O número do diploma o identifica, e sem ele "art. 31 da Lei" não aponta
+# norma alguma. O indicador de número é dispensável ("Lei 8.212/1993") e
+# aparece em várias grafias ("nº", "n.º", "no"), de modo que o que precisa
+# ser exigido é a separação entre o nome e o número. O número termina em
+# algarismo, para que o ponto final da frase fique de fora do span.
+_INDICADOR_DE_NUMERO = r"(?:\s*n[.]?[º°o]?[.]?\s*|\s*-\s*|\s+)"
+_NUMERO_DO_DIPLOMA = rf"{_INDICADOR_DE_NUMERO}\d[\d./-]*\d"
+_DIPLOMA = rf"(?:{_NOME_DO_DIPLOMA}(?:{_NUMERO_DO_DIPLOMA})?)"
 # A distinção de caixa delimita o nome do diploma, separando-o do texto
 # que vem depois; por isso o padrão é sensível a maiúsculas.
 _PADRAO_ARTIGO = re.compile(
@@ -169,6 +178,14 @@ _PADRAO_PREPOSICAO_ANO = re.compile(r"\b(?:de|em)\s+\d{4}$", re.IGNORECASE)
 _ALCANCE_DO_ROTULO = 24
 
 
+# O dispositivo invocado por um artigo é citação normativa, e o diploma que
+# ele nomeia vale pelo texto que carrega, não pelo ato que o publicou: em
+# "art. 14 do Decreto 27.427/00" a norma é o dispositivo, ao passo que o
+# mesmo decreto citado sozinho é ato do Executivo. O que separa os dois é o
+# artigo à frente.
+_PADRAO_ABERTURA_DE_DISPOSITIVO = re.compile(r"^[Aa]rt(?:igo)?\b")
+
+
 def _e_numero_administrativo(texto: str, inicio: int, trecho: str) -> bool:
     """O número é cadastral ou administrativo, e não identifica julgado.
 
@@ -176,6 +193,8 @@ def _e_numero_administrativo(texto: str, inicio: int, trecho: str) -> bool:
     de recurso, ou imediatamente antes dele, quando o número foi capturado
     sozinho.
     """
+    if _PADRAO_ABERTURA_DE_DISPOSITIVO.match(trecho):
+        return False
     antes = texto[max(0, inicio - _ALCANCE_DO_ROTULO) : inicio]
     return bool(
         _PADRAO_ROTULO_NAO_JURISPRUDENCIAL.search(antes)

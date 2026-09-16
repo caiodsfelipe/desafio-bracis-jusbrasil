@@ -121,6 +121,43 @@ def test_publicacao_nao_apaga_a_citacao_que_acompanha(texto, esperado):
 
 
 @pytest.mark.parametrize(
+    "texto",
+    [
+        "art. 31 da Lei 8.212/1993",
+        "art. 39 da Lei n.º 8.177/1991",
+        "art. 73, § 50, da Lei no 9.504/97",
+        "art. 1º da LC nº 64/90",
+        "art. 18, II, h, da LC no 75/93",
+        "artigo 3º, I, da LC-108/2001",
+        "art. 51 do Decreto-Lei nº 3.688/1941",
+        "art. 2º do Decreto-lei 491",
+        "art. 4º do Decreto- Lei 4.657/42",
+        "art. 146 do Decreto n.º 99.244/90",
+        "art. 75 da Lei Complementar nº 64/1990",
+    ],
+)
+def test_numero_do_diploma_entra_no_span(texto):
+    """O número identifica o diploma: sem ele "art. 31 da Lei" não aponta
+    norma alguma, e a resolução dá por inventada uma citação real. O
+    indicador de número é dispensável e aparece em várias grafias, de modo
+    que o span não pode depender dele para alcançar o número."""
+    assert texto in trechos(texto)
+
+
+@pytest.mark.parametrize(
+    "texto",
+    [
+        "art. 14, do Decreto 27.427/00",
+        "artigo 12 do Decreto-lei nº 509/69",
+    ],
+)
+def test_diploma_invocado_por_artigo_nao_e_ato_administrativo(texto):
+    """O decreto citado sozinho é ato do Executivo; invocado por um artigo,
+    é o diploma que carrega a norma. O artigo à frente separa os dois."""
+    assert texto in trechos(texto)
+
+
+@pytest.mark.parametrize(
     ("texto", "esperado"),
     [
         ("A Reclamação nº 66.516/RO", "Reclamação nº 66.516/RO"),
