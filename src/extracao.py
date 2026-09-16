@@ -42,7 +42,11 @@ class CandidatoCitacao:
 # observadas: nestas a primeira citação aparece no caractere 460, e um
 # endereçamento cem caracteres mais enxuto já faria o corte engolir
 # citação legítima.
-_LARGURA_DE_PROSA = 90
+# Largura a partir da qual uma linha é prosa e não rótulo. O resultado é o
+# mesmo de 30 a 90 caracteres e se degrada a partir de 95, quando o corte
+# passa a atravessar linhas de corpo; 60 fica no meio do intervalo estável,
+# longe das duas bordas.
+_LARGURA_DE_PROSA = 60
 _ROTULO_DE_QUALIFICACAO = re.compile(
     r"^\s*(?:[A-ZÀ-Ý][\wÀ-ÿ.\- ]{0,30}:"
     r"|Autos|Processos?|Protocolo|Apelante|Apelad[oa]|Recorrente|Recorrid[oa]"
