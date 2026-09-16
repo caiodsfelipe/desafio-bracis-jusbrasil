@@ -33,3 +33,7 @@ venv/
 
 # macOS
 .DS_Store
+
+# Revisão gravada no pacote (gerada por `python empacotar.py` a cada zip;
+# versioná-la faria o pacote apontar para o commit anterior ao que o contém)
+src/revisao.py
