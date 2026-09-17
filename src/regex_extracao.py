@@ -151,8 +151,28 @@ _ROTULOS_DE_AUTOS = (
     r"|[Mm]ov|[Pp][áa]g(?:ina)?"
 )
 
+# A peça mede prazos, valores e frações, e marca a data da sessão. O número
+# que segue essas palavras é quantidade, não identificador: "Sessão de
+# 12/03/2024", "Desconto de 1/3 da pena", "Item 4.2 do edital".
+_ROTULOS_DE_MEDIDA = (
+    r"[Ss]ess[ãa]o|[Pp]ublicad[oa]|[Jj]ulgad[oa]\s+em|[Aa]utuad[oa]"
+    r"|[Dd]esconto|[Aa]cr[ée]scimo|[Rr]edu[çc][ãa]o|[Aa]l[íi]quota"
+    r"|[Hh]onor[áa]rios|[Cc]ustas|[Jj]uros|[Mm]ulta|[Cc]orre[çc][ãa]o"
+    r"|[Ii]tem|[Cc]l[áa]usula|[Vv]olume|[Tt]omo|[Cc]ap[íi]tulo"
+)
+
+# O ato do Legislativo e do Executivo tem número próprio e não é julgado. O
+# dispositivo que o invoca continua sendo citação normativa, porque o
+# filtro não alcança o trecho aberto por artigo.
+_ATOS_NORMATIVOS = (
+    r"[Ee]menda\s+[Cc]onstitucional|EC"
+    r"|[Mm]edida\s+[Pp]rovis[óo]ria|MP"
+    r"|[Pp]rojeto\s+de\s+[Ll]ei|PL|PEC"
+)
+
 _ROTULOS_NAO_JURISPRUDENCIAIS = (
     rf"{_ROTULOS_CADASTRAIS}|{_VEICULOS_DE_PUBLICACAO}|{_ROTULOS_DE_AUTOS}"
+    rf"|{_ROTULOS_DE_MEDIDA}|{_ATOS_NORMATIVOS}"
 )
 # Entre o rótulo e o número cabem o indicador de número, a pontuação e a
 # preposição que datam a publicação: "DJe de 14/3/2024", "Protocolo nº

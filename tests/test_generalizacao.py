@@ -304,3 +304,45 @@ def test_verbo_colado_ao_recurso_e_limite_conhecido(verbo):
     corpo = "Trata-se de parecer jurídico elaborado para consulta prévia. " * 8
     com_artigo = [o.trecho for o in extrair_todos(f"{corpo}{verbo} o RE 1234/SP.")]
     assert "RE 1234/SP" in com_artigo
+
+
+@pytest.mark.parametrize(
+    "texto",
+    [
+        "Sessão de 12/03/2024.",
+        "Publicado em 20/05/2023.",
+        "Desconto de 1/3 da pena.",
+        "Item 4.2 do edital.",
+        "Cláusula 7 do contrato.",
+        "Emenda Constitucional 45.",
+        "Medida Provisória 1.000.",
+    ],
+)
+def test_medida_e_ato_normativo_nao_sao_jurisprudencia(texto):
+    """A peça marca a data da sessão, mede prazos e frações, e cita atos do
+    Legislativo: nada disso identifica julgado. Quatro dessas frases num
+    documento custavam 0,208 do score."""
+    from extracao import extrair_todos
+
+    corpo = "Trata-se de parecer jurídico elaborado para consulta prévia. " * 8
+    assert [o.trecho for o in extrair_todos(corpo + texto)] == []
+
+
+@pytest.mark.parametrize(
+    "texto",
+    [
+        "art. 75 da LC 64/90",
+        "art. 31 da Lei 8.212/1993",
+        "processo nº TST-RR-79500-16.2009.5.15.0016",
+        "acórdão do STJ julgado em 2023 sob relatoria de Assusete Magalhães",
+    ],
+)
+def test_filtro_de_medida_nao_alcanca_a_citacao(texto):
+    """O diploma com número em forma de data ("LC 64/90"), o processo
+    designado por "processo nº" e o julgado descrito por "julgado em" são
+    citações, e o filtro que descarta medida e ato normativo não pode
+    alcançá-los."""
+    from extracao import extrair_todos
+
+    corpo = "Trata-se de parecer jurídico elaborado para consulta prévia. " * 8
+    assert texto in [o.trecho for o in extrair_todos(corpo + texto)]
