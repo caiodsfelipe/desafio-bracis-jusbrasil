@@ -4,12 +4,17 @@ Verificação de citações jurídicas em pareceres gerados por IA. Dado um
 documento, localizar cada citação de jurisprudência ou de lei e classificá-la
 como `real` (com o `id_canonico` do registro), `inventada` ou `incompleta`.
 
-**Resultado na competição: 1.09803** (métrica oficial, sobre a versão anterior do dataset).
+**Resultado na competição: 1.100**, o teto da métrica oficial, com macro-F1 de
+1,0 nos dois níveis, nenhum erro grave e as 192 citações extraídas.
 
 O leaderboard atual roda sobre a amostra de treino distribuída, e reinicia
 quando o conjunto final for ativado: a classificação sai de 40% públicos e
 60% privados de documentos que ninguém viu. O que vale, portanto, é
-generalizar, e não pontuar nestes 26 documentos.
+generalizar, e não pontuar nestes 26 documentos. Por isso as medidas que
+guiaram o desenvolvimento não são o placar, e sim as da seção
+[Generalização](#generalização): o resultado contra uma segunda versão do
+dataset, o valor de cada regra nas duas, o comportamento sob perturbação e a
+forma do que os padrões capturam num corpus de mil acórdãos reais.
 
 ## Abordagem
 
@@ -108,17 +113,31 @@ se o processo citado existe.
 **O modelo decide só o que a estrutura não decide.** Ele é consultado quando
 dois processos foram autuados com o mesmo número e diferem apenas na espécie
 do recurso, caso em que só a leitura dos cabeçalhos separa um do outro. No
-conjunto de referência isso ocorre uma vez em 195 citações, e é a única
-consulta ao modelo em todo o pipeline. Trocar a resposta por qualquer valor
-fixo muda o score em menos de 0.007.
+conjunto de referência isso ocorre uma vez em 192 citações, e é a única
+consulta ao modelo em todo o pipeline. O pior caso possível, com o modelo
+escolhendo sempre a opção errada, custa 0,0034; resposta vazia ou ilegível
+recai na primeira opção e não muda o resultado.
+
+Os pesos só são carregados na primeira pergunta, e as disputas de todos os
+documentos vão numa só ida à GPU. Sobre 40 acórdãos reais, o cenário denso,
+isso reduz as passadas pelo modelo de 19 para 1.
 
 **A confiança declarada é medida, não estimada.** Cada caminho tem a sua,
 calibrada pela taxa de acerto observada. O bônus mede a distância entre a
 confiança e o acerto efetivo, de modo que rebaixá-la abaixo da taxa medida
-custa tanto quanto exagerá-la. Todos os caminhos acertam integralmente o
-conjunto de referência, e o valor que maximiza o bônus é 0,99: fica acima de
-0,98 quando tudo acerta e à frente de 1,00 quando três predições falham,
-porque declarar certeza absoluta e errar custa o dobro.
+custa tanto quanto exagerá-la.
+
+Os cinco caminhos estruturais acertam integralmente as duas versões do
+conjunto e declaram 1,0, porque só um Brier exatamente zero leva o bônus ao
+teto de 0,10: com 0,9999 o score fica em 1,099999999, e o leaderboard, que
+trunca em cinco casas, exibe 1,09999.
+
+Os cinco caminhos que dependem do modelo ou de sinal indireto não declaram
+confiança nenhuma. O campo é opcional, e a média do Brier corre apenas sobre
+quem o declara: omiti-lo retira a citação do cálculo do bônus sem tirá-la da
+classificação. Para um caminho que pode errar, calar domina qualquer valor
+declarado, e em 75 combinações de fração de caminho incerto, taxa de erro e
+semente, omitir nunca ficou atrás.
 
 ## Estrutura
 
@@ -131,10 +150,12 @@ src/
   normalizacao.py          normaliza o identificador dentro do span
   indice_normativo.py      índice dos 18 registros de súmula e dispositivo
   resolucao.py             busca no acervo, roteamento, classe e confiança
+  contrato.py              saída no formato do contrato do desafio
   llm_qwen.py              carregamento e geração com o Qwen3-8B
   prompts/                 prompts versionados, com histórico e notas
 tests/                     suíte de regressão, sem banco e sem modelo
-notebook_kaggle.py         célula única que gera submission.csv no Kaggle
+notebook_kaggle.py         célula única que gera os JSONs e o submission.csv
+empacotar.py               zip do dataset do Kaggle, com a revisão do commit
 avaliar.py                 avaliação reprodutível contra o conjunto de referência
 robustez.py                score sob perturbação dos documentos
 generalizacao.py           desempenho por documento, para expor ajuste excessivo
@@ -143,6 +164,16 @@ ablacao.py                 valor de cada regra nas duas bases, para expor assime
 corpus.py                  auditoria dos padrões contra os acórdãos reais do acervo
 comparar.py                diferença de comportamento contra uma versão anterior
 ```
+
+O artefato oficial da solução é um JSON por documento, de onde o
+`submission.csv` sai pelo conversor da organização. O notebook grava os dois,
+e um teste trava que o CSV escrito direto é byte a byte o que o conversor
+produziria a partir dos JSONs.
+
+`empacotar.py` monta o pacote do zero a cada execução, para que arquivo
+removido do repositório não sobreviva dentro dele, e grava no pacote o commit
+que o gerou, que o notebook imprime: é o que a verificação de
+reprodutibilidade do desafio coleta.
 
 ### Prompts versionados
 
@@ -174,9 +205,10 @@ desafio exigem ferramentas de pesos e código abertos.
 
 ## Executar
 
-Os dados da competição não estão versionados (ver `.gitignore`). Baixe
-`desafio1_bracis.db`, `txt/`, `goldenset.csv` e `kaggle_metric.py` da aba
-*Data* da competição e coloque na raiz do projeto.
+Os dados da competição não estão versionados, porque a licença deles é a das
+regras do desafio e não nossa (ver `.gitignore`). Baixe `desafio1_bracis.db`,
+`txt/`, o `goldenset` e `kaggle_metric.py` da aba *Data* da competição e
+coloque na raiz do projeto.
 
 ```bash
 pip install torch transformers pandas numpy pytest
@@ -189,6 +221,7 @@ python generalizacao.py          # desempenho documento a documento
 python corpus.py                 # forma dos trechos nos acórdãos reais do acervo
 python contraprova.py <base>     # score contra outra versão do conjunto
 python ablacao.py --base-antiga <base>   # valor de cada regra nas duas bases
+python empacotar.py              # zip do dataset do Kaggle, com a revisão do commit
 ```
 
 `avaliar.py` imprime o score por nível, a cobertura da extração e o acerto por
@@ -207,6 +240,8 @@ revisão do melhor resultado conhecido:
 python comparar.py v1.0.0
 ```
 
+## Generalização
+
 ### A contraprova de duas bases
 
 A organização publicou duas versões do dataset, e a diferença entre elas é
@@ -215,7 +250,7 @@ a melhor prova de generalização disponível. Medido com `contraprova.py`:
 | código | base anterior | base final |
 |---|---|---|
 | antes do ajuste | 0,9924 | 0,9759 |
-| **depois** | **1,0819** | **1,0999** |
+| **depois** | **1,0826** | **1,1000** |
 
 A versão anterior marcava 1,09803 no leaderboard e não passava de 0,99 em
 nenhuma das duas bases reais. A diferença vinha de um gabarito que ela
@@ -239,11 +274,11 @@ avaliação cego, cujo ruído não está no conjunto de referência:
 
 | Perturbação | Score |
 |---|---|
-| nenhuma | 1.0999 |
-| ruído de digitalização em 2% dos algarismos | 1.0879 |
+| nenhuma | 1.1000 |
+| ruído de digitalização em 2% dos algarismos | 1.0880 |
 | ponto de milhar entregue como espaço | 1.0746 |
-| indicador de número com o outro sinal de grau | 1.0999 |
-| travessão no lugar do hífen | 1.0999 |
+| indicador de número com o outro sinal de grau | 1.1000 |
+| travessão no lugar do hífen | 1.1000 |
 
 ### Ablação: o que cada regra vale nas duas bases
 
@@ -283,10 +318,11 @@ exercitam porque pertencem ao outro gênero textual:
 
 As duas juntas custavam 0,2555, injetadas nos 26 documentos. Ambas têm a
 forma de identificador sem apontar julgado algum, e a resolução as dava por
-inventadas com confiança 0,99, que é o pior tipo de falso positivo para a
+inventadas com confiança plena, que é o pior tipo de falso positivo para a
 métrica. Depois do filtro, os trechos abertos por rótulo indevido caíram de
 cerca de 4.000 para 5 em 22.577 (0,022%), e o score das duas bases não se
-moveu.
+moveu. A varredura dos 1014 acórdãos, e não mais de uma amostra, confirma
+0,036%.
 
 A auditoria do fim do span expôs um terceiro defeito, esse com efeito na
 classificação e não só na delimitação. O span do dispositivo parava no nome
@@ -318,6 +354,48 @@ curto o excedente derruba a sobreposição abaixo de 0,5 e a citação é
 contada como perdida. A distinção agora é morfológica, não enumerada: o
 artigo, o verbo com pronome (`Registre-se`) e o advérbio em `-mente`
 introduzem a citação sem pertencer a ela.
+
+### Testes metamórficos e adversariais
+
+Relações que devem valer para qualquer entrada, e não só para as
+observadas: a mesma citação em sete formulações diferentes recebe a mesma
+classe e o mesmo `id_canonico`; trocar a ordem de duas citações não altera
+nenhuma delas; acrescentar uma citação nova não muda as anteriores; a mesma
+citação repetida é classificada igual nas duas vezes.
+
+A bateria adversarial é escrita para quebrar o sistema, não para confirmá-lo,
+e foi o que rendeu os dois achados de maior custo. A prosa jurídica corrente
+virava citação:
+
+| Texto | Span extraído | Custo |
+|---|---|---|
+| "o prazo de 15 dias úteis" | `Prazo de 15` | 0,105 |
+| "multa de 20% sobre o valor" | `Multa de 20` | por três frases |
+| "Sessão de 12/03/2024" | `Sessao de 12/03/2024` | 0,208 |
+| "Desconto de 1/3 da pena" | `Desconto de 1/3` | por quatro |
+| "Emenda Constitucional 45" | `Emenda Constitucional 45` | frases |
+
+A preposição liga o número à palavra anterior como quantidade, prazo ou
+data, e nenhuma das 192 citações do conjunto termina assim. A medida, o item
+do edital e o ato do Legislativo entram na lista do que nunca é
+jurisprudência. A distinção é pelo rótulo e não pela forma do número:
+descartar `n/n` pela aparência quebraria `LC 64/90`, que é diploma citado no
+gabarito.
+
+Um limite fica registrado em teste, em vez de escondido: sem artigo entre o
+verbo e o nome do recurso, `Transcrevo RE 99/SP` rende sobreposição de 0,42
+e perde a citação. Separar o verbo exigiria enumerá-los, porque a terminação
+não os distingue de `Agravo`, `Processo` e `Recurso`. O caso é artificial em
+português, que pede o artigo, e aparece uma vez em 28.754 trechos do acervo.
+
+### Entrada de outro gênero textual
+
+Os 26 documentos do conjunto são pareceres. Rodar o pipeline sobre 40
+acórdãos reais como entrada, e não como base de busca, rendeu 7.599 citações
+sem nenhuma exceção e com distribuição equilibrada entre as três classes.
+Nesse corpus, 7,76% das citações caem em caminhos que dependem do modelo ou
+de sinal indireto, contra 1,6% nos pareceres: é onde mora o risco residual
+caso o conjunto final se pareça mais com peça real.
 
 Requer GPU para o pipeline completo. Em bfloat16 o modelo ocupa cerca de
 16.4 GB; no Kaggle (T4 ×2) é distribuído entre as duas GPUs com

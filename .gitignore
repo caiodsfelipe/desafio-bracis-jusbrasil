@@ -1,10 +1,10 @@
-# Dados da competição — não versionar (baixados da aba Data no Kaggle).
+# Dados da competição, baixados da aba Data no Kaggle. Não versionar.
 # O .db tem 93MB (acima do limite recomendado de 50MB por arquivo do GitHub)
 # e as regras do desafio tratam o acervo como cobertura congelada distribuída
 # pela organização, não como material nosso a redistribuir.
 desafio1_bracis.db
 txt/
-goldenset.csv
+goldenset*.csv
 sample_submission.csv
 kaggle_metric.py
 json_to_submission.py
