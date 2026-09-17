@@ -168,9 +168,16 @@ _PADRAO_ROTULO_NO_TRECHO = re.compile(
     rf"(?:^|\b)(?:{_ROTULOS_NAO_JURISPRUDENCIAIS})\b{_LIGACAO_ROTULO_NUMERO}\d"
 )
 
-# Um ano precedido de preposição encerra uma citação em prosa, não um
-# identificador de processo.
-_PADRAO_PREPOSICAO_ANO = re.compile(r"\b(?:de|em)\s+\d{4}$", re.IGNORECASE)
+# Um número que a preposição liga à palavra anterior é quantidade, prazo ou
+# data, não identificador: "prazo de 15 dias", "multa de 20%", "julgado em
+# 30 de abril", "acórdão de 2023". O identificador do processo não se
+# prende ao nome do recurso por preposição, e nenhuma das 192 citações do
+# conjunto de referência termina assim.
+#
+# A pontuação estrutural do identificador o distingue: "Rcl 45.678" e
+# "REsp 1.234.567/SP" trazem separador, e sobrevivem à regra mesmo quando
+# algo os antecede.
+_PADRAO_PREPOSICAO_NUMERO = re.compile(r"\b(?:de|em)\s+\d+$", re.IGNORECASE)
 
 
 # Alcance do rótulo antes do número: cabe "Protocolo nº" e "OAB/MG", não uma
@@ -209,7 +216,7 @@ def extrair_candidatos(texto: str) -> list[tuple[int, int, str]]:
     for padrao in (_PADRAO_CITACAO, _PADRAO_SUMULA, _PADRAO_ARTIGO, _PADRAO_TEMA):
         for m in padrao.finditer(texto):
             trecho = m.group()
-            if _PADRAO_PREPOSICAO_ANO.search(trecho):
+            if _PADRAO_PREPOSICAO_NUMERO.search(trecho):
                 continue
             if _e_numero_administrativo(texto, m.start(), trecho):
                 continue
