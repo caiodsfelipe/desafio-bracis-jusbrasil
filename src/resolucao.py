@@ -407,3 +407,33 @@ def resolver_citacao(
     """Resolve um único candidato. Para um documento inteiro, prefira
     `resolver_citacoes`, que agrupa as chamadas ao LLM."""
     return resolver_citacoes(con, qwen, indice_normativo, [candidato])[0]
+
+
+def resolver_documentos(
+    con: sqlite3.Connection,
+    qwen,
+    indice_normativo: dict[tuple[str, ...], int],
+    candidatos_por_documento: dict[str, list],
+) -> dict[str, list[Resolucao]]:
+    """Resolve vários documentos de uma vez, com uma só ida ao modelo.
+
+    Resolver documento a documento faz o lote do LLM ter o tamanho das
+    disputas de um único documento, e a passada pela GPU custa quase o mesmo
+    para um prompt ou para dezesseis. Juntar as disputas de todos os
+    documentos numa chamada é o que torna o custo proporcional ao número de
+    disputas, e não ao número de documentos.
+
+    As citações de todos os documentos são concatenadas numa lista só, cuja
+    origem é reconstruída pelas fronteiras entre elas.
+    """
+    todos = []
+    faixas = []
+    for documento, candidatos in candidatos_por_documento.items():
+        inicio = len(todos)
+        todos.extend(candidatos)
+        faixas.append((documento, inicio, len(todos)))
+
+    resolvidos = resolver_citacoes(con, qwen, indice_normativo, todos)
+    return {
+        documento: resolvidos[inicio:fim] for documento, inicio, fim in faixas
+    }

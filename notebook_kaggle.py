@@ -25,7 +25,7 @@ from contrato import gravar
 from extracao import extrair_todos
 from indice_normativo import construir_indice
 from llm_qwen import QwenClassificador
-from resolucao import resolver_citacoes
+from resolucao import resolver_documentos
 
 print(f"revisão {revisao.COMMIT}, empacotada em {revisao.GERADO_EM}")
 
@@ -36,13 +36,24 @@ qwen = QwenClassificador()
 documentos = sorted(
     f[:-4] for f in os.listdir(os.path.join(BASE, "txt")) if f.endswith(".txt")
 )
-saida_json = pathlib.Path("jsons")
-linhas = []
+
+# A extração percorre todos os documentos antes de qualquer resolução, para
+# que as disputas de todos eles caibam numa só ida ao modelo.
+candidatos_por_documento = {}
 for nome in documentos:
     caminho = os.path.join(BASE, "txt", nome + ".txt")
     texto = open(caminho, encoding="utf-8").read()
-    candidatos = extrair_todos(texto)
-    resolucoes = resolver_citacoes(con, qwen, indice, candidatos) if candidatos else []
+    candidatos_por_documento[nome] = extrair_todos(texto)
+
+resolucoes_por_documento = resolver_documentos(
+    con, qwen, indice, candidatos_por_documento
+)
+
+saida_json = pathlib.Path("jsons")
+linhas = []
+for nome in documentos:
+    candidatos = candidatos_por_documento[nome]
+    resolucoes = resolucoes_por_documento[nome]
     gravar(saida_json, nome, candidatos, resolucoes)
     partes = [
         f"{c.inicio},{c.fim},{r.classe},"
@@ -60,3 +71,8 @@ with open("submission.csv", "w", newline="", encoding="utf-8") as arquivo:
 citacoes = sum(linha[1].count("|") + 1 for linha in linhas if linha[1] != "-")
 print(f"{saida_json}/: {len(documentos)} JSONs do contrato")
 print(f"submission.csv: {len(linhas)} documentos, {citacoes} citações")
+print(
+    "modelo carregado"
+    if qwen.carregado
+    else "modelo não foi necessário: a estrutura resolveu todas as citações"
+)

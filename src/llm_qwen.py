@@ -22,24 +22,52 @@ class RespostaLLM:
 
 
 class QwenClassificador:
-    """Mantém o modelo carregado para todas as chamadas do pipeline."""
+    """Mantém o modelo carregado para todas as chamadas do pipeline.
+
+    Os pesos só são baixados e distribuídos na primeira pergunta. A maioria
+    dos documentos resolve todas as citações pela estrutura, e carregar
+    dezesseis gigabytes para não perguntar nada custa a metade do tempo de
+    execução.
+    """
 
     def __init__(self, device_map: str = "balanced"):
+        self._device_map = device_map
+        self._tokenizer = None
+        self._model = None
+
+    def _carregar(self) -> None:
+        if self._model is not None:
+            return
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
-        self.tokenizer = AutoTokenizer.from_pretrained(
+        self._tokenizer = AutoTokenizer.from_pretrained(
             MODELO_ID, revision=MODELO_REVISAO
         )
         # As camadas são distribuídas entre as GPUs disponíveis; o modelo
         # não cabe numa placa de 16 GB sozinha.
-        self.model = AutoModelForCausalLM.from_pretrained(
+        self._model = AutoModelForCausalLM.from_pretrained(
             MODELO_ID,
             revision=MODELO_REVISAO,
-            torch_dtype=torch.bfloat16,
-            device_map=device_map,
+            dtype=torch.bfloat16,
+            device_map=self._device_map,
         )
-        self.model.eval()
+        self._model.eval()
+
+    @property
+    def tokenizer(self):
+        self._carregar()
+        return self._tokenizer
+
+    @property
+    def model(self):
+        self._carregar()
+        return self._model
+
+    @property
+    def carregado(self) -> bool:
+        """O modelo já ocupou memória."""
+        return self._model is not None
 
     def _montar_entrada(self, prompt_sistema: str, prompt_usuario: str) -> str:
         return self.tokenizer.apply_chat_template(
@@ -64,11 +92,14 @@ class QwenClassificador:
         O preenchimento é aplicado à esquerda porque a geração continua a
         partir do último token da sequência. `tamanho_lote` limita o
         consumo de memória, que acompanha o prompt mais longo do lote.
-        """
-        import torch
 
+        Sem prompts nada é carregado: a saída vazia precede qualquer toque
+        no modelo.
+        """
         if not prompts_usuario:
             return []
+
+        import torch
 
         # Com o modelo repartido entre GPUs, a entrada acompanha o
         # dispositivo da primeira camada.
