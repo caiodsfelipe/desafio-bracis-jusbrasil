@@ -8,6 +8,7 @@ que o notebook escreve direto separaria a submissão medida da submissão
 enviada.
 """
 
+import importlib.util
 import json
 
 import pytest
@@ -18,6 +19,14 @@ from contrato import (
     documento_em_contrato,
     gravar,
     tipo_da_citacao,
+)
+
+# O conversor é script da organização, baixado da aba Data e não versionado
+# aqui: os casos que o confrontam com o JSON só rodam onde os dados da
+# competição estão instalados.
+exige_conversor = pytest.mark.skipif(
+    importlib.util.find_spec("json_to_submission") is None,
+    reason="json_to_submission.py vem com os dados da competição",
 )
 
 
@@ -78,6 +87,7 @@ def test_confianca_omitida_nao_aparece_no_json():
     assert "resolucao" not in citacao
 
 
+@exige_conversor
 def test_json_gravado_e_lido_pelo_conversor_da_organizacao(tmp_path):
     """O conversor lê classificacao, resolucao.id_canonico e confianca; o
     que ele produz é a linha que o notebook escreve direto."""
@@ -90,6 +100,7 @@ def test_json_gravado_e_lido_pelo_conversor_da_organizacao(tmp_path):
     assert encode(documento) == "10,22,real,123,0.9999|30,49,incompleta,-,-"
 
 
+@exige_conversor
 def test_documento_sem_citacoes_vira_traco():
     """O Kaggle rejeita célula vazia."""
     from json_to_submission import encode

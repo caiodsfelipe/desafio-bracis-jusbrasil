@@ -42,7 +42,8 @@ documentos = sorted(
 candidatos_por_documento = {}
 for nome in documentos:
     caminho = os.path.join(BASE, "txt", nome + ".txt")
-    texto = open(caminho, encoding="utf-8").read()
+    with open(caminho, encoding="utf-8") as arquivo:
+        texto = arquivo.read()
     candidatos_por_documento[nome] = extrair_todos(texto)
 
 resolucoes_por_documento = resolver_documentos(
@@ -59,7 +60,7 @@ for nome in documentos:
         f"{c.inicio},{c.fim},{r.classe},"
         f"{str(r.id_canonico) if r.id_canonico else '-'},"
         f"{'-' if r.confianca is None else format(r.confianca, '.4f')}"
-        for c, r in zip(candidatos, resolucoes)
+        for c, r in zip(candidatos, resolucoes, strict=True)
     ]
     linhas.append((nome, "|".join(partes) or "-"))
 

@@ -18,4 +18,9 @@ jobs:
       - name: Suíte de regressão
         run: pytest tests/ -q
       - name: Análise estática
-        run: ruff check src tests avaliar.py
+        # Os scripts da organização (kaggle_metric.py, json_to_submission.py)
+        # não entram: são material distribuído, não nosso a corrigir.
+        run: >
+          ruff check src tests
+          ablacao.py avaliar.py comparar.py contraprova.py corpus.py
+          empacotar.py generalizacao.py notebook_kaggle.py robustez.py

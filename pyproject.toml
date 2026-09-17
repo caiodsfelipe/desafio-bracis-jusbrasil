@@ -26,3 +26,8 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 [tool.ruff.lint.per-file-ignores]
 # O texto de um prompt é literal e não comporta quebra de linha.
 "src/prompts/*.py" = ["E501"]
+# A célula do Kaggle só encontra os módulos depois de ajustar sys.path, e
+# por isso os imports do projeto vêm abaixo dele, num bloco que a ordenação
+# automática classificaria de outra forma conforme `src/` esteja ou não no
+# caminho de quem roda a checagem.
+"notebook_kaggle.py" = ["E402", "I001"]
