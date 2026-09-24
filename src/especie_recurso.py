@@ -51,9 +51,21 @@ _FAMILIA_POR_EXTENSO = {
 _SIGLAS_POR_TAMANHO = sorted(_FAMILIA_POR_SIGLA, key=len, reverse=True)
 
 # Quanto do texto ao redor da ocorrência nomeia a espécie: a designação vem
-# imediatamente antes do número.
+# imediatamente antes do número. A janela é estreita de propósito: alargá-la
+# de 80 para 200 muda a espécie lida em 19% das ocorrências do acervo,
+# porque passa a alcançar a designação da citação vizinha.
 _CONTEXTO_ANTES = 80
 _CONTEXTO_DEPOIS = 10
+
+# A fórmula de autuação é lida numa janela própria, e mais larga. Ela não
+# vem colada ao número como a designação da espécie: entre "Vistos,
+# relatados e discutidos estes autos de" e o número cabem o nome do recurso,
+# a origem e as partes. Medida sobre as 529 ocorrências do acervo, a
+# distância tem mediana 71 e p90 156, de modo que 80 alcança 58% delas e
+# 240 alcança 95%. Alargar aqui não afeta a leitura da espécie, que
+# continua na janela estreita: uma fórmula vizinha não é confundível com
+# outra coisa, ao passo que uma sigla vizinha é.
+_CONTEXTO_DA_AUTUACAO = 240
 
 
 def familia(texto: str) -> str | None:
@@ -85,5 +97,5 @@ _FORMULA_DE_AUTUACAO = re.compile(
 
 def autua_o_processo(texto: str, inicio: int) -> bool:
     """O número é apresentado como os autos que o acórdão julga."""
-    antes = texto[max(0, inicio - _CONTEXTO_ANTES) : inicio]
+    antes = texto[max(0, inicio - _CONTEXTO_DA_AUTUACAO) : inicio]
     return bool(_FORMULA_DE_AUTUACAO.search(" ".join(antes.split())))
