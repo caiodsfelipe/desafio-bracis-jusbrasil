@@ -79,7 +79,17 @@ for nome in sorted(f[:-4] for f in os.listdir({documentos!r}) if f.endswith(".tx
         candidatos = extrair_todos(texto, extrair_citacoes(espiao, texto))
     resolucoes = resolver_citacoes(con, espiao, indice, candidatos) if candidatos else []
     predicoes[nome] = [
-        [c.inicio, c.fim, r.classe, r.id_canonico, round(r.confianca, 4)]
+        # A confiança é opcional: os caminhos que dependem do modelo ou de
+        # sinal indireto não a declaram, e omiti-la é o que os retira da
+        # média do Brier. O campo ausente entra como None, para que a
+        # comparação registre a omissão em vez de quebrar diante dela.
+        [
+            c.inicio,
+            c.fim,
+            r.classe,
+            r.id_canonico,
+            None if r.confianca is None else round(r.confianca, 4),
+        ]
         for c, r in zip(candidatos, resolucoes)
     ]
 print(json.dumps({{"predicoes": predicoes, "prompts": espiao.prompts}}, ensure_ascii=False))
