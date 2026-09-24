@@ -72,5 +72,37 @@ def test_ano_de_julgamento_nao_e_identificador():
     assert normalizar_identificadores("julgado do STF proferido em 2024") == []
 
 
+@pytest.mark.parametrize(
+    "trecho, ano, processo",
+    [
+        ("Petição 45.556/2023", "2.023", "45.556"),
+        ("REsp 1.234.567/SP, julgado em 12/03/2024", "2.024", "1.234.567"),
+        ("Reclamação 77.777/2.024", "2.024", "77.777"),
+        ("ADI 6.524 (07/01/2021)", "2.021", "6.524"),
+    ],
+)
+def test_ano_que_acompanha_o_numero_do_processo_sai(trecho, ano, processo):
+    """O ano do julgamento não identifica processo algum, e a preposição
+    nem sempre o antecede.
+
+    O FTS5 ignora o separador de milhar e busca "2.024" como o par de
+    tokens "2 024", que casa com o sequencial de um acórdão sem relação com
+    a citação. Como são poucos os registros atingidos, o número escapa do
+    filtro de ambiguidade e faz um processo inventado passar por `real`.
+
+    O dia e o mês continuam na lista: são curtos, casam com boa parte do
+    acervo e o filtro de ambiguidade já os neutraliza.
+    """
+    identificadores = normalizar_identificadores(trecho)
+    assert ano not in identificadores
+    assert identificadores[0] == processo
+
+
+def test_ano_sozinho_continua_sendo_identificador():
+    """Só há o que contaminar quando o ano acompanha outro número; sozinho
+    ele segue como o único identificador disponível."""
+    assert normalizar_identificadores("Processo 2024") == ["2.024"]
+
+
 def test_citacao_sem_numero_nao_produz_identificador():
     assert normalizar_identificadores("precedente do STM, relatoria de Marco Antonio") == []

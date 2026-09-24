@@ -145,6 +145,29 @@ _DIGITO_DE_ORGAO = re.compile(
 # sigla, de inciso ou de numeração de item.
 _MINIMO_DE_ALGARISMOS = 2
 
+# O ano do julgamento acompanha o número do processo em boa parte das
+# citações ("Petição 45.556/2023", "REsp 1.234.567/SP, julgado em
+# 12/03/2024"), e a preposição nem sempre o antecede, de modo que
+# _PREPOSICAO_ANO não o alcança. Sozinho ele não identifica processo algum,
+# mas o FTS5 ignora o separador de milhar e busca "2.023" como o par de
+# tokens "2 023", que casa com o sequencial de um acórdão sem relação com a
+# citação. Como são poucos os registros assim atingidos, o número escapa do
+# filtro de ambiguidade e contamina a resolução: um processo inventado
+# passa a ser dado por `real`, com o link errado e confiança plena, que é o
+# erro que a métrica mais pune.
+#
+# O ano só é descartado quando acompanha outro identificador. A citação que
+# traz apenas um número com forma de ano continua resolvendo por ele, já
+# que nesse caso não há o que contaminar.
+_ANO_ISOLADO = re.compile(r"^(?:19|20)\d{2}$")
+
+
+def _identifica_processo(algarismos: str, total_de_blocos: int) -> bool:
+    """O bloco identifica o processo, e não a data do julgamento."""
+    if len(algarismos) < _MINIMO_DE_ALGARISMOS:
+        return False
+    return not (total_de_blocos > 1 and _ANO_ISOLADO.match(algarismos))
+
 
 def normalizar_identificadores(span: str) -> list[str]:
     """Identificadores normalizados presentes no span, um por bloco
@@ -152,13 +175,17 @@ def normalizar_identificadores(span: str) -> list[str]:
     julgado referido apenas por tribunal, ano e relator."""
     descartados = set(_PREPOSICAO_ANO.findall(span))
     descartados.update(_DIGITO_DE_ORGAO.findall(span))
-    identificadores = []
+    normalizados = []
     for bloco in _BLOCO_CANDIDATO.findall(span):
         if not any(c.isdigit() for c in bloco):
             continue
         normalizado = _normalizar_bloco(bloco)
         algarismos = re.sub(r"\D", "", normalizado)
-        if len(algarismos) < _MINIMO_DE_ALGARISMOS or algarismos in descartados:
+        if algarismos in descartados:
             continue
-        identificadores.append(normalizado)
-    return identificadores
+        normalizados.append((normalizado, algarismos))
+    return [
+        normalizado
+        for normalizado, algarismos in normalizados
+        if _identifica_processo(algarismos, len(normalizados))
+    ]
