@@ -181,3 +181,69 @@ def test_especie_conhecida_e_incompativel_nega_a_existencia():
     ]
     resolucao = _desempatar_por_posicao(candidatos, CITACAO)
     assert (resolucao.classe, resolucao.id_canonico) == ("inventada", None)
+
+
+# A citação pode trazer, além do número do processo, o dia e o mês do
+# julgamento e o ano de dois algarismos do diploma. Esses acompanhantes são
+# curtos, casam com boa parte do acervo e não identificam processo algum; o
+# que os testes abaixo fixam é que eles não decidem a classe da citação.
+def _acervo_em_memoria(documentos):
+    """Acervo mínimo com o índice FTS5 que a resolução consulta."""
+    import sqlite3
+
+    con = sqlite3.connect(":memory:")
+    con.execute(
+        "CREATE TABLE documentos"
+        " (id INTEGER, documento_id TEXT, tribunal TEXT, natureza TEXT, texto TEXT)"
+    )
+    con.execute("CREATE VIRTUAL TABLE documentos_fts USING fts5(texto)")
+    for id_canonico, texto in documentos:
+        con.execute(
+            "INSERT INTO documentos (id, documento_id, tribunal, natureza, texto)"
+            " VALUES (?, ?, NULL, 'acordao', ?)",
+            (id_canonico, f"d{id_canonico}", texto),
+        )
+        con.execute(
+            "INSERT INTO documentos_fts (rowid, texto) VALUES"
+            " ((SELECT rowid FROM documentos WHERE id = ?), ?)",
+            (id_canonico, texto),
+        )
+    return con
+
+
+class _ModeloMudo:
+    """Responde a primeira opção, sem carregar pesos."""
+
+    def gerar_lote(self, prompt_sistema, prompts_usuario, **_):
+        from llm_qwen import RespostaLLM
+
+        return [RespostaLLM("1") for _ in prompts_usuario]
+
+
+def _resolver(con, trecho):
+    from extracao import CandidatoCitacao
+    from resolucao import resolver_citacao
+
+    candidato = CandidatoCitacao(0, len(trecho), trecho, "padrao")
+    return resolver_citacao(con, _ModeloMudo(), {}, candidato)
+
+
+def test_ano_da_citacao_nao_torna_real_um_processo_inventado():
+    """O ano é buscado no acervo como o par de tokens "2 024" e casa com o
+    sequencial de um acórdão qualquer. Sem descartá-lo, um número que o
+    acervo não contém passaria por `real`, com link errado e confiança
+    plena, que é o erro que a métrica mais pune."""
+    con = _acervo_em_memoria([(10, "RECURSO ESPECIAL Nº 2024005 - RJ " + "x" * 400)])
+    resolucao = _resolver(con, "Reclamação 77.777/2.024")
+    assert (resolucao.classe, resolucao.id_canonico) == ("inventada", None)
+
+
+def test_numero_curto_da_data_nao_apaga_a_resposta_do_processo():
+    """O dia e o mês casam com boa parte do acervo e são ambíguos por
+    definição. Como o número do processo já respondeu — o acervo não o
+    contém —, a citação é inventada, e não incompleta."""
+    con = _acervo_em_memoria(
+        [(idc, f"Documento {idc} de 07 e 01 no acervo. " + "x" * 200) for idc in range(1, 30)]
+    )
+    resolucao = _resolver(con, "ADI 9.999.999 (07/01/2021)")
+    assert (resolucao.classe, resolucao.caminho) == ("inventada", "sem_candidato")

@@ -337,6 +337,14 @@ def resolver_citacoes(
 
         acervo_do_candidato: list[Candidato] = []
         ambiguo_demais = False
+        # A citação pode trazer mais de um bloco numérico: além do número do
+        # processo, o dia e o mês do julgamento ("ADI 6.524 (07/01/2021)") e
+        # o ano de dois algarismos do diploma ("Lei nº 6.385/76"). Esses
+        # acompanhantes são curtos e casam com boa parte do acervo, de modo
+        # que um deles sozinho marcaria a citação como ambígua e apagaria a
+        # resposta que o número do processo já dera. A ambiguidade de um
+        # acompanhante só pesa quando nenhum identificador foi decisivo.
+        algum_decisivo = False
         for identificador in identificadores:
             if identificador not in cache_busca:
                 if contar_candidatos(con, identificador) > _MAX_CANDIDATOS_PARA_CLASSIFICAR:
@@ -346,12 +354,18 @@ def resolver_citacoes(
             if cache_busca[identificador] is None:
                 ambiguo_demais = True
                 continue
+            algum_decisivo = True
             acervo_do_candidato.extend(
                 # súmulas e dispositivos não têm processo a quem pertencer
                 a
                 for a in cache_busca[identificador]
                 if a.natureza == "acordao" and a.ocorrencia is not None
             )
+        # Um identificador que o acervo não contém é resposta, não silêncio:
+        # a citação é inventada, e a ambiguidade do acompanhante não a
+        # transforma em incompleta.
+        if algum_decisivo:
+            ambiguo_demais = False
 
         # Registro único: não há ambiguidade a resolver.
         distintos = {a.id_canonico for a in acervo_do_candidato}
