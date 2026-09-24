@@ -397,6 +397,59 @@ Nesse corpus, 7,76% das citações caem em caminhos que dependem do modelo ou
 de sinal indireto, contra 1,6% nos pareceres: é onde mora o risco residual
 caso o conjunto final se pareça mais com peça real.
 
+### O número que acompanha o número
+
+A mesma auditoria expôs a diferença de forma que mais custa caro entre os
+dois gêneros. Nos 26 pareceres, toda citação com identificador produz
+exatamente um: a distribuição é 120 de 120. Nos acórdãos reais, 8,2% das
+citações produzem dois ou mais, porque a peça real gruda no número do
+processo o dia e o mês do julgamento (`ADI 6.524 (07/01/2021)`), o ano
+(`Petição 45.556/2023`) e o ano do diploma (`Lei nº 6.385/76`).
+
+O acompanhante não identifica processo algum, mas era buscado no acervo
+como se identificasse, e o resultado entrava no mesmo bolo do número
+verdadeiro. O ano é o caso perigoso: o FTS5 ignora o separador de milhar e
+procura `2.023` como o par de tokens `2 023`, que casa com o sequencial de
+um acórdão sem relação com a citação. Como são poucos os registros assim
+atingidos — de um a quatro para cada ano recente —, o número passava pelo
+filtro de ambiguidade, que só barra o que aparece em mais de oito. O efeito
+medido, com número de processo que o acervo não contém:
+
+| Citação | Antes | Agora |
+|---|---|---|
+| `Petição 99.999/2.023` | `real`, link errado, confiança 1,0 | `inventada` |
+| `AgInt no AREsp 6.666.666 (2.022/0000001-0)` | `real`, link errado, confiança 1,0 | `inventada` |
+| `REsp 8.888.888/SP, julgado em 12/03/2.020` | `real`, link errado, confiança 1,0 | `inventada` |
+
+É a troca que a métrica pune com γ=0,5, declarada no teto da confiança, que
+é o pior par possível. O ano passou a ser descartado quando acompanha outro
+identificador, e mantido quando é o único que a citação traz, já que aí não
+há o que contaminar. O dia e o mês continuam na lista: são curtos, casam com
+boa parte do acervo e o filtro de ambiguidade já os neutraliza.
+
+Esse filtro, por sua vez, tinha o defeito simétrico. Um acompanhante ambíguo
+marcava a citação inteira como `incompleta`, apagando a resposta que o
+número do processo já havia dado — e não haver registro nenhum é resposta,
+não silêncio. Em 60 acórdãos reais isso ocorre 44 vezes. A ambiguidade de um
+acompanhante agora só pesa quando nenhum identificador foi decisivo.
+
+Nenhuma das duas correções muda uma só predição nos 26 documentos, e o
+`comparar.py` confirma: as duas versões são idênticas nas predições e nos
+prompts. São defesa para a forma que o conjunto final pode ter e o conjunto
+de referência não tem.
+
+### Uma janela para cada pergunta
+
+`_CONTEXTO_ANTES` servia a duas perguntas com respostas opostas. Ler a
+espécie do recurso pede janela estreita: alargá-la de 80 para 200 muda a
+espécie lida em 19% das ocorrências do acervo, porque passa a alcançar a
+designação da citação vizinha. Achar a fórmula de autuação pede janela
+larga: entre "Vistos, relatados e discutidos estes autos de" e o número
+cabem o nome do recurso, a origem e as partes, e a distância entre os dois
+tem mediana 71 e p90 156 nas 529 ocorrências do acervo, de modo que 80
+alcança 58% delas e 240 alcança 95%. As duas janelas foram separadas, cada
+uma com a medida da sua pergunta.
+
 Requer GPU para o pipeline completo. Em bfloat16 o modelo ocupa cerca de
 16.4 GB; no Kaggle (T4 ×2) é distribuído entre as duas GPUs com
 `device_map="balanced"`.

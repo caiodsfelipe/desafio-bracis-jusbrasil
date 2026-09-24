@@ -5,7 +5,7 @@ Dois conjuntos de padrões percorrem o mesmo texto, um para as citações que
 trazem identificador e outro para as que descrevem o julgado sem dar seu
 número, e seus resultados são mesclados numa lista única e deduplicada.
 
-A extração não consulta o modelo. Os padrões alcançam as 195 citações do
+A extração não consulta o modelo. Os padrões alcançam as 192 citações do
 conjunto de referência, de modo que um trecho apontado só pelo modelo cai
 necessariamente fora delas: medido sobre o mesmo conjunto que a avaliação
 oficial usa, a etapa custava 0,079 do score, porque um candidato espúrio
