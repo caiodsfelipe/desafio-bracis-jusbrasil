@@ -36,7 +36,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/ src/
 COPY tests/ tests/
 COPY executar.py baixar_modelo.py run.sh pyproject.toml ./
-COPY kaggle_metric.py json_to_submission.py ./
+
+# Os scripts da organização (kaggle_metric.py, json_to_submission.py) vêm da
+# aba Data da competição e não são redistribuídos aqui, de modo que podem não
+# existir no clone. A execução não depende deles: servem à avaliação local, e
+# os testes que os usam são marcados para pular quando faltam. O destino em
+# `./` com a barra final copia o que casar e não falha quando nada casa.
+COPY *metric.py *submission.py ./
 
 # `baixar_modelo.py` precisa de rede, e por isso roda num `docker run`
 # próprio, não aqui: a construção da imagem não baixa os pesos.
