@@ -270,6 +270,93 @@ def _desempatar_por_posicao(
     return None
 
 
+class _BuscaNoAcervo:
+    """Busca por identificador, memorizada por execução.
+
+    Um identificador que casa com documentos demais não distingue processo
+    algum, e para ele o inteiro teor nunca é lido: a contagem precede a
+    leitura porque carregar centenas de documentos para descartá-los em
+    seguida custa dezenas de megabytes por citação. O resultado fica
+    guardado, já que a mesma citação reaparece entre documentos.
+    """
+
+    def __init__(self, con: sqlite3.Connection):
+        self._con = con
+        self._por_identificador: dict[str, list[Candidato] | None] = {}
+
+    def acordaos(self, identificador: str) -> list[Candidato] | None:
+        """Acórdãos que contêm o identificador, ou None quando ele aparece em
+        documentos demais para distinguir um."""
+        if identificador not in self._por_identificador:
+            self._por_identificador[identificador] = self._carregar(identificador)
+        return self._por_identificador[identificador]
+
+    def _carregar(self, identificador: str) -> list[Candidato] | None:
+        if contar_candidatos(self._con, identificador) > _MAX_CANDIDATOS_PARA_CLASSIFICAR:
+            return None
+        return [
+            # súmulas e dispositivos não têm processo a quem pertencer
+            a
+            for a in buscar_candidatos(self._con, identificador)
+            if a.natureza == "acordao" and a.ocorrencia is not None
+        ]
+
+
+def _reunir_do_acervo(
+    busca: _BuscaNoAcervo, identificadores: list[str]
+) -> tuple[list[Candidato], bool]:
+    """Registros que respondem pelos identificadores da citação, e se a
+    citação ficou sem resposta por ambiguidade.
+
+    A citação pode trazer mais de um bloco numérico: além do número do
+    processo, o dia e o mês do julgamento ("ADI 6.524 (07/01/2021)") e o ano
+    de dois algarismos do diploma ("Lei nº 6.385/76"). Esses acompanhantes
+    são curtos e casam com boa parte do acervo, de modo que a ambiguidade de
+    um deles só pesa quando nenhum identificador foi decisivo: um número que
+    o acervo não contém é resposta, não silêncio.
+    """
+    reunidos: list[Candidato] = []
+    algum_decisivo = False
+    ambiguo = False
+    for identificador in identificadores:
+        encontrados = busca.acordaos(identificador)
+        if encontrados is None:
+            ambiguo = True
+            continue
+        algum_decisivo = True
+        reunidos.extend(encontrados)
+    return reunidos, ambiguo and not algum_decisivo
+
+
+def _resolver_normativa(
+    indice_normativo: dict[tuple[str, ...], int], trecho: str
+) -> Resolucao:
+    """Súmula ou artigo de lei, pelo índice dos registros próprios desses
+    dispositivos: buscá-los no FTS devolveria os acórdãos que os mencionam."""
+    from indice_normativo import resolver_normativo
+
+    id_normativo = resolver_normativo(indice_normativo, trecho)
+    if id_normativo is None:
+        return resolvido_por("normativo", "inventada")
+    return resolvido_por("normativo", "real", id_normativo)
+
+
+def _resolver_pelo_acervo(
+    registros: list[Candidato], ambiguo: bool, trecho: str
+) -> "Resolucao | None":
+    """Classe da citação a partir dos registros encontrados, ou None quando
+    só a leitura dos cabeçalhos pelo modelo decide."""
+    if len({a.id_canonico for a in registros}) == 1:
+        return resolvido_por("registro_unico", "real", registros[0].id_canonico)
+    if not registros:
+        # O identificador ambíguo existe no acervo, mas não identifica um
+        # registro; sem ambiguidade, nenhum registro o contém.
+        if ambiguo:
+            return resolvido_por("ambiguo", "incompleta")
+        return resolvido_por("sem_candidato", "inventada")
+    return _desempatar_por_posicao(registros, trecho)
+
+
 def resolver_citacoes(
     con: sqlite3.Connection,
     qwen,
@@ -279,116 +366,71 @@ def resolver_citacoes(
     """Classe, id_canonico e confiança de cada candidato, na ordem de
     entrada.
 
-    Súmulas e artigos de lei resolvem pelo índice normativo, que aponta
-    para os registros próprios desses dispositivos; buscá-los no FTS
-    devolveria os acórdãos que os mencionam. Os demais são buscados pelo
-    identificador normalizado. Citações sem identificador, o julgado
-    referido apenas por tribunal, ano e relator, são `incompleta`.
-
-    O trabalho determinístico de todos os candidatos é feito primeiro, e
-    as perguntas ao LLM seguem numa única chamada em lote.
+    O trabalho determinístico de todos os candidatos é feito primeiro, e as
+    perguntas ao LLM seguem numa única chamada em lote.
     """
-    from indice_normativo import eh_citacao_normativa, resolver_normativo
+    from indice_normativo import eh_citacao_normativa
     from normalizacao import normalizar_identificadores
-    from prompt_dono import NENHUMA, escolher_registro_lote
 
+    busca = _BuscaNoAcervo(con)
     resultados: list[Resolucao | None] = [None] * len(candidatos)
-    disputas: list[tuple[str, list[str]]] = []
-    # Um identificador que casa com documentos demais é registrado como None,
-    # e o acervo não chega a ser lido para ele.
-    cache_busca: dict[str, list[Candidato] | None] = {}
-    pendentes: list[tuple[int, list[Candidato]]] = []
+    # Citações que nenhum critério estrutural separou, e que vão ao modelo
+    # juntas no fim: a posição guarda onde cada resposta volta.
+    em_disputa: list[tuple[int, list[Candidato]]] = []
 
     for posicao, candidato in enumerate(candidatos):
-        if eh_citacao_normativa(candidato.trecho):
-            id_normativo = resolver_normativo(indice_normativo, candidato.trecho)
-            resultados[posicao] = (
-                resolvido_por("normativo", "real", id_normativo)
-                if id_normativo is not None
-                else resolvido_por("normativo", "inventada")
-            )
+        trecho = candidato.trecho
+        if eh_citacao_normativa(trecho):
+            resultados[posicao] = _resolver_normativa(indice_normativo, trecho)
             continue
 
-        identificadores = normalizar_identificadores(candidato.trecho)
+        identificadores = normalizar_identificadores(trecho)
         if not identificadores:
+            # O julgado referido apenas por tribunal, ano e relator.
             resultados[posicao] = resolvido_por("sem_identificador", "incompleta")
             continue
 
-        acervo_do_candidato: list[Candidato] = []
-        ambiguo_demais = False
-        # A citação pode trazer mais de um bloco numérico: além do número do
-        # processo, o dia e o mês do julgamento ("ADI 6.524 (07/01/2021)") e
-        # o ano de dois algarismos do diploma ("Lei nº 6.385/76"). Esses
-        # acompanhantes são curtos e casam com boa parte do acervo, de modo
-        # que um deles sozinho marcaria a citação como ambígua e apagaria a
-        # resposta que o número do processo já dera. A ambiguidade de um
-        # acompanhante só pesa quando nenhum identificador foi decisivo.
-        algum_decisivo = False
-        for identificador in identificadores:
-            if identificador not in cache_busca:
-                if contar_candidatos(con, identificador) > _MAX_CANDIDATOS_PARA_CLASSIFICAR:
-                    cache_busca[identificador] = None
-                else:
-                    cache_busca[identificador] = buscar_candidatos(con, identificador)
-            if cache_busca[identificador] is None:
-                ambiguo_demais = True
-                continue
-            algum_decisivo = True
-            acervo_do_candidato.extend(
-                # súmulas e dispositivos não têm processo a quem pertencer
-                a
-                for a in cache_busca[identificador]
-                if a.natureza == "acordao" and a.ocorrencia is not None
-            )
-        # Um identificador que o acervo não contém é resposta, não silêncio:
-        # a citação é inventada, e a ambiguidade do acompanhante não a
-        # transforma em incompleta.
-        if algum_decisivo:
-            ambiguo_demais = False
-
-        # Registro único: não há ambiguidade a resolver.
-        distintos = {a.id_canonico for a in acervo_do_candidato}
-        if len(distintos) == 1:
-            resultados[posicao] = resolvido_por(
-                "registro_unico", "real", acervo_do_candidato[0].id_canonico
-            )
-            continue
-
-        if not acervo_do_candidato:
-            # Sem candidatos classificáveis: o identificador ambíguo indica
-            # que o número existe no acervo mas não identifica um registro.
-            resultados[posicao] = (
-                resolvido_por("ambiguo", "incompleta")
-                if ambiguo_demais
-                else resolvido_por("sem_candidato", "inventada")
-            )
-            continue
-
-        resolucao = _desempatar_por_posicao(acervo_do_candidato, candidato.trecho)
+        registros, ambiguo = _reunir_do_acervo(busca, identificadores)
+        resolucao = _resolver_pelo_acervo(registros, ambiguo, trecho)
         if resolucao is not None:
             resultados[posicao] = resolucao
             continue
 
         # Vários processos foram autuados com o mesmo número e diferem na
         # espécie do recurso; só a leitura dos cabeçalhos os separa.
-        em_disputa = _um_por_registro(acervo_do_candidato)
-        disputas.append((candidato.trecho, [a.texto for a in em_disputa]))
-        pendentes.append((posicao, em_disputa))
+        em_disputa.append((posicao, _um_por_registro(registros)))
 
-    escolhas = escolher_registro_lote(qwen, disputas)
-
-    for (posicao, em_disputa), escolha in zip(pendentes, escolhas, strict=True):
-        # O modelo recusou todas: o número consta do acervo apenas em
-        # fundamentações, e nenhum processo responde por ele.
-        resultados[posicao] = (
-            resolvido_por("so_mencionado", "inventada")
-            if escolha == NENHUMA
-            else resolvido_por("desempate", "real", em_disputa[escolha].id_canonico)
-        )
+    for posicao, resolucao in _resolver_disputas(qwen, candidatos, em_disputa):
+        resultados[posicao] = resolucao
 
     if any(r is None for r in resultados):
         raise AssertionError("todo candidato deve receber uma classe")
     return resultados
+
+
+def _resolver_disputas(
+    qwen, candidatos: list, em_disputa: list[tuple[int, list[Candidato]]]
+) -> list[tuple[int, Resolucao]]:
+    """Disputas de todos os documentos resolvidas numa só ida ao modelo."""
+    from prompt_dono import NENHUMA, escolher_registro_lote
+
+    perguntas = [
+        (candidatos[posicao].trecho, [a.texto for a in registros])
+        for posicao, registros in em_disputa
+    ]
+    escolhas = escolher_registro_lote(qwen, perguntas)
+
+    decididas = []
+    for (posicao, registros), escolha in zip(em_disputa, escolhas, strict=True):
+        # O modelo recusou todas: o número consta do acervo apenas em
+        # fundamentações, e nenhum processo responde por ele.
+        if escolha == NENHUMA:
+            decididas.append((posicao, resolvido_por("so_mencionado", "inventada")))
+        else:
+            decididas.append(
+                (posicao, resolvido_por("desempate", "real", registros[escolha].id_canonico))
+            )
+    return decididas
 
 
 def resolver_citacao(
