@@ -20,8 +20,8 @@ exercita, porque acórdão e parecer são gêneros distintos:
     referência de autos     "Evento 17", "ID 61582938", "fls. 45"
 
 Ambas têm a forma de identificador sem apontar julgado algum, e a resolução
-as daria por inventadas com confiança alta. Medido por injeção nos 26
-documentos, o par custava 0,2555 do score.
+as daria por inventadas com confiança alta, que é o pior tipo de falso
+positivo para a métrica.
 
 O que resta capturar são os casos em que a digitalização intercalou texto
 entre o rótulo e o número ("DJe DIVULG 14.4.2020"), 0,022% dos trechos.

@@ -69,9 +69,12 @@ class QwenClassificador:
             self._tokenizer = AutoTokenizer.from_pretrained(MODELO_ID, **comuns)
             # As camadas são distribuídas pelas GPUs disponíveis: a placa
             # única da avaliação recebe o modelo inteiro.
+            # `torch_dtype`, e não `dtype`: é o nome que `from_pretrained`
+            # aceita na versão fixada em requirements.txt, e passar o outro
+            # levanta TypeError antes de carregar qualquer peso.
             self._model = AutoModelForCausalLM.from_pretrained(
                 MODELO_ID,
-                dtype=torch.bfloat16,
+                torch_dtype=torch.bfloat16,
                 device_map=self._device_map,
                 **comuns,
             )

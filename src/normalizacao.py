@@ -152,9 +152,8 @@ _MINIMO_DE_ALGARISMOS = 2
 # mas o FTS5 ignora o separador de milhar e busca "2.023" como o par de
 # tokens "2 023", que casa com o sequencial de um acórdão sem relação com a
 # citação. Como são poucos os registros assim atingidos, o número escapa do
-# filtro de ambiguidade e contamina a resolução: um processo inventado
-# passa a ser dado por `real`, com o link errado e confiança plena, que é o
-# erro que a métrica mais pune.
+# filtro de ambiguidade, e um processo que o acervo não contém seria dado por
+# `real` com o link errado, que é o erro que a métrica mais pune.
 #
 # O ano só é descartado quando acompanha outro identificador. A citação que
 # traz apenas um número com forma de ano continua resolvendo por ele, já

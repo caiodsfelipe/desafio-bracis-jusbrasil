@@ -7,9 +7,8 @@ número, e seus resultados são mesclados numa lista única e deduplicada.
 
 A extração não consulta o modelo. Os padrões alcançam as 192 citações do
 conjunto de referência, de modo que um trecho apontado só pelo modelo cai
-necessariamente fora delas: medido sobre o mesmo conjunto que a avaliação
-oficial usa, a etapa custava 0,079 do score, porque um candidato espúrio
-por documento tira 0,096 e não havia recall a ganhar.
+necessariamente fora delas, e um candidato espúrio por documento custa
+0,096 do score sem recall a ganhar em troca.
 """
 import re
 from dataclasses import dataclass

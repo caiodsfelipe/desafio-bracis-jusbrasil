@@ -114,46 +114,25 @@ def buscar_candidatos(con: sqlite3.Connection, identificador: str) -> list[Candi
 
 
 # A confiança é uma propriedade do caminho que resolveu a citação, calibrada
-# pela taxa de acerto que o caminho apresenta. O bônus mede a distância
-# entre a confiança declarada e o acerto efetivo, de modo que rebaixá-la
-# abaixo da taxa medida custa tanto quanto exagerá-la.
+# pela taxa de acerto que o caminho apresenta. O bônus é 0,10·(1 − brier), e
+# mede a distância entre a confiança declarada e o acerto efetivo, de modo que
+# rebaixá-la abaixo da taxa medida custa tanto quanto exagerá-la.
 #
-# Os caminhos estruturais acertam integralmente as duas versões do conjunto
-# de referência, e declaram 1,0. O valor sai de uma propriedade do
-# arredondamento, não de uma convicção sobre o acervo: o bônus é
-# 0,10·(1 − brier), e um brier de 1e-8, o que 0,9999 produz quando tudo
-# acerta, dá 0,099999999. O score fica em 1,099999999 e o leaderboard, que
-# trunca em cinco casas, exibe 1,09999. Só o brier exatamente zero fecha em
-# 1,10000.
+# Os caminhos estruturais acertam integralmente as duas versões do conjunto de
+# referência e declaram 1,0. Só o brier exatamente zero leva o bônus ao teto:
+# com 0,9999 o score fica em 1,099999999, que o leaderboard, truncando em cinco
+# casas, exibe como 1,09999.
 #
-#   erros em 192      0,9999 (truncado)   1,0 (truncado)
-#   ------------      -----------------   --------------
-#   nenhum                      1,09999          1,10000
-#   dois                        1,08573          1,08573
-#   quarenta                    0,79011          0,79010
-#
-# A partir do primeiro erro a diferença cai para a ordem de 1e-7, invisível
-# no truncamento: o dígito que 1,0 ganha quando tudo acerta não tem
-# contrapartida mensurável quando não acerta.
-#
-# A margem para o caso não observado não está nesta casa decimal, e sim no
-# campo omitido.
-#
-# O campo é opcional na submissão, e a média do Brier corre apenas sobre as
-# citações que o declaram: omiti-lo numa citação a retira do cálculo sem
+# Os caminhos que dependem do modelo ou de sinal indireto não declaram
+# confiança. O campo é opcional, e a média do Brier corre apenas sobre as
+# citações que o declaram: omiti-lo retira a citação do cálculo do bônus sem
 # tirá-la da classificação. Para um caminho que pode errar, calar domina
-# qualquer valor declarado: se acerta, a média das demais já está no teto e
-# nada se perde; se erra, o termo que puxaria o bônus para baixo não entra.
-# Medido em 75 combinações de fração de caminho incerto, taxa de erro e
-# semente, omitir nunca ficou atrás de declarar, e chegou a render 0,0157.
+# qualquer valor declarado — se acerta, a média das demais já está no teto; se
+# erra, o termo que puxaria o bônus para baixo não entra.
 #
-# Por isso os caminhos que dependem do modelo ou de sinal indireto não
-# declaram confiança: OMITIR não é ausência de estimativa, é a estimativa
-# de que ali a taxa de acerto não foi medida em amostra que a sustente.
-#
-# Dois caminhos podem partilhar o mesmo valor quando acertam na mesma
-# medida: é o caminho que a `Resolucao` carrega, não a confiança, que
-# identifica a origem da decisão.
+# Dois caminhos podem partilhar o mesmo valor quando acertam na mesma medida: é
+# o caminho que a `Resolucao` carrega, não a confiança, que identifica a origem
+# da decisão.
 OMITIR = None
 
 CONFIANCA_POR_CAMINHO = {

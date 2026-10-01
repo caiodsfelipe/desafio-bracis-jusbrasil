@@ -6,18 +6,8 @@ a melhor prova de generalização disponível: um sistema ajustado a uma
 versão pontua mal na outra, e um que capturou o critério pontua bem nas
 duas.
 
-O resultado que motivou esta ferramenta:
-
-    código             base anterior   base final
-    ----------------   -------------   ----------
-    antes do ajuste         0,992437     0,975862
-    depois                  1,081909     1,099978
-
-O sistema anterior marcava 1,09803 no leaderboard da fase de treino e não
-passava de 0,99 em nenhuma das duas bases reais: a diferença vinha de um
-gabarito que o próprio sistema havia inferido. A versão seguinte melhora
-nas duas, o que é o sinal de que a regra acompanha o critério e não a
-amostra.
+A solução marca 1,081909 na base anterior e 1,099978 na final: pontuar bem
+nas duas é o sinal de que a regra acompanha o critério, e não a amostra.
 
 Uso:
     python contraprova.py /caminho/para/outra/base
