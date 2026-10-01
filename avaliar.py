@@ -72,19 +72,11 @@ def _celula_do_gabarito(citacoes):
 
 
 def _celula_da_predicao(candidatos, resolucoes):
-    partes = []
-    for candidato, resolucao in zip(candidatos, resolucoes, strict=True):
-        id_canonico = str(resolucao.id_canonico) if resolucao.id_canonico else "-"
-        # A confiança é opcional, e o caminho que não a declara fica fora da
-        # média do Brier em vez de puxá-la para baixo.
-        confianca = (
-            "-" if resolucao.confianca is None else f"{resolucao.confianca:.4f}"
-        )
-        partes.append(
-            f"{candidato.inicio},{candidato.fim},{resolucao.classe},"
-            f"{id_canonico},{confianca}"
-        )
-    return "|".join(partes) or "-"
+    """O formato vive em `contrato.py`, junto do JSON que descreve a mesma
+    predição. Aqui fica só o nome pelo qual os demais scripts o conhecem."""
+    from contrato import celula_da_predicao
+
+    return celula_da_predicao(candidatos, resolucoes)
 
 
 def prever(con, modelo, indice, texto):

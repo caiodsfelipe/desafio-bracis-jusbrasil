@@ -11,9 +11,26 @@ sempre a mesma saída. O modo de raciocínio passo a passo fica desligado:
 a tarefa é de leitura direta.
 """
 from dataclasses import dataclass
+from pathlib import Path
 
 MODELO_ID = "Qwen/Qwen3-8B"
 MODELO_REVISAO = "b968826d9c46dd6066d109eabc6255188de91218"
+
+# Os pesos são baixados antes da execução, por `baixar_modelo.py`, e ficam no
+# cache do repositório. Em bfloat16 o modelo ocupa cerca de 16,4 GB e cabe
+# numa só placa de 24 GB, que é o limite das regras de execução.
+#
+# `device_map="auto"` acomoda tanto a placa única da avaliação quanto as duas
+# do Kaggle, onde "balanced" era necessário porque 16,4 GB não cabem numa T4
+# de 16 GB. "auto" reparte do mesmo modo quando há duas placas e usa a única
+# quando há uma, de modo que o mesmo código serve aos dois ambientes.
+DEVICE_MAP_PADRAO = "auto"
+
+# A execução da avaliação não tem internet. Apontar o cache para dentro do
+# repositório, e exigir modo offline, faz o carregamento falhar de imediato
+# e com mensagem clara se os pesos não tiverem sido baixados antes, em vez de
+# tentar alcançar a rede e expirar.
+CACHE_DO_MODELO = Path(__file__).resolve().parent.parent / "modelo"
 
 
 @dataclass
@@ -30,7 +47,7 @@ class QwenClassificador:
     execução.
     """
 
-    def __init__(self, device_map: str = "balanced"):
+    def __init__(self, device_map: str = DEVICE_MAP_PADRAO):
         self._device_map = device_map
         self._tokenizer = None
         self._model = None
@@ -41,17 +58,29 @@ class QwenClassificador:
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
-        self._tokenizer = AutoTokenizer.from_pretrained(
-            MODELO_ID, revision=MODELO_REVISAO
-        )
-        # As camadas são distribuídas entre as GPUs disponíveis; o modelo
-        # não cabe numa placa de 16 GB sozinha.
-        self._model = AutoModelForCausalLM.from_pretrained(
-            MODELO_ID,
-            revision=MODELO_REVISAO,
-            dtype=torch.bfloat16,
-            device_map=self._device_map,
-        )
+        # O cache local e o modo offline valem para esta carga: os pesos já
+        # estão em disco, e alcançar a rede não é permitido nem necessário.
+        comuns = {
+            "revision": MODELO_REVISAO,
+            "cache_dir": str(CACHE_DO_MODELO),
+            "local_files_only": True,
+        }
+        try:
+            self._tokenizer = AutoTokenizer.from_pretrained(MODELO_ID, **comuns)
+            # As camadas são distribuídas pelas GPUs disponíveis: a placa
+            # única da avaliação recebe o modelo inteiro.
+            self._model = AutoModelForCausalLM.from_pretrained(
+                MODELO_ID,
+                dtype=torch.bfloat16,
+                device_map=self._device_map,
+                **comuns,
+            )
+        except OSError as erro:
+            raise RuntimeError(
+                f"pesos de {MODELO_ID} não encontrados em {CACHE_DO_MODELO}."
+                " Rode `python baixar_modelo.py` antes da execução, com"
+                " internet disponível."
+            ) from erro
         self._model.eval()
 
     @property

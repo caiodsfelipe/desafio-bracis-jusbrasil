@@ -12,6 +12,11 @@ json_to_submission.py
 # Pacote gerado para upload no Kaggle Dataset (reconstruível com um comando)
 desafio_bracis_projeto.zip
 
+# Pesos do Qwen3-8B, baixados por `python baixar_modelo.py` em revisão fixa.
+# São 16 GB e vêm do Hugging Face, não daqui: o repositório referencia a
+# revisão, como as regras de envio permitem, em vez de redistribuir os pesos.
+modelo/
+
 # Página da competição salva localmente
 *.html
 *_files/

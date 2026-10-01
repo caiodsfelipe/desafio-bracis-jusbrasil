@@ -50,6 +50,28 @@ def documento_em_contrato(documento_id: str, candidatos, resolucoes) -> dict:
     return {"documento_id": documento_id, "citacoes": citacoes}
 
 
+def celula_da_predicao(candidatos, resolucoes) -> str:
+    """Célula `citacoes` do submission.csv: as citações de um documento,
+    separadas por barra vertical, ou "-" quando não há nenhuma.
+
+    O formato vive aqui, junto do JSON, porque os dois descrevem a mesma
+    predição: o CSV é o que o conversor da organização produz a partir do
+    JSON, e escrevê-lo em dois lugares faria a igualdade entre eles depender
+    de duas cópias concordarem à mão.
+
+    A confiança é opcional, e o caminho que não a declara entra como "-":
+    omiti-la retira a citação da média do Brier sem tirá-la da
+    classificação.
+    """
+    partes = [
+        f"{candidato.inicio},{candidato.fim},{resolucao.classe},"
+        f"{resolucao.id_canonico if resolucao.id_canonico else '-'},"
+        f"{'-' if resolucao.confianca is None else format(resolucao.confianca, '.4f')}"
+        for candidato, resolucao in zip(candidatos, resolucoes, strict=True)
+    ]
+    return "|".join(partes) or "-"
+
+
 def gravar(destino: Path, documento_id: str, candidatos, resolucoes) -> Path:
     """Grava o JSON de um documento e devolve o caminho escrito."""
     destino.mkdir(parents=True, exist_ok=True)

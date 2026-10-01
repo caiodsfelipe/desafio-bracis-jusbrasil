@@ -1,0 +1,17 @@
+# Ambiente da execução, com versões fixas para que a avaliação rode sobre o
+# mesmo que foi medido aqui.
+#
+# torch 2.5.1 + cu121 é a combinação que a imagem base do Dockerfile traz, e
+# transformers 4.51 é o mínimo que conhece a arquitetura do Qwen3.
+torch==2.5.1
+transformers==4.51.3
+tokenizers==0.21.1
+safetensors==0.4.5
+accelerate==1.0.1
+huggingface-hub==0.26.2
+pandas==2.2.3
+numpy==1.26.4
+
+# Usados pela suíte de regressão e pela avaliação local, não pela execução.
+pytest==8.3.3
+ruff==0.6.9

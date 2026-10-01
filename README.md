@@ -154,6 +154,10 @@ src/
   llm_qwen.py              carregamento e geração com o Qwen3-8B
   prompts/                 prompts versionados, com histórico e notas
 tests/                     suíte de regressão, sem banco e sem modelo
+run.sh                     ponto de entrada único: <db> <pasta_txt> <saida>
+executar.py                pipeline completo por argumento, sem caminho fixo
+baixar_modelo.py           traz os pesos na revisão fixa, para rodar offline
+Dockerfile                 ambiente declarado, com as versões de requirements
 notebook_kaggle.py         célula única que gera os JSONs e o submission.csv
 empacotar.py               zip do dataset do Kaggle, com a revisão do commit
 avaliar.py                 avaliação reprodutível contra o conjunto de referência
@@ -205,13 +209,69 @@ desafio exigem ferramentas de pesos e código abertos.
 
 ## Executar
 
+### Ponto de entrada
+
+Um comando recebe o acervo, a pasta dos documentos e o arquivo de saída:
+
+```bash
+bash run.sh <caminho_db> <pasta_txt> <arquivo_saida>
+```
+
+Ele grava o `submission.csv` no formato das submissões e, ao lado dele, os
+JSONs do contrato, que são o artefato oficial da solução. Os três caminhos
+chegam por argumento: nada depende de caminho absoluto, de variável de
+ambiente ou de arquivo que exista só na máquina de desenvolvimento.
+
+Antes da primeira execução, e uma única vez, os pesos precisam ser baixados
+com internet disponível:
+
+```bash
+python baixar_modelo.py    # Qwen3-8B na revisão fixa, para ./modelo (16 GB)
+```
+
+A execução em si é **offline**: `run.sh` exporta `HF_HUB_OFFLINE=1`, e o
+carregamento usa `local_files_only=True`. Se os pesos não estiverem em
+`modelo/`, a falha é imediata e diz o que fazer, em vez de tentar a rede.
+
+**Hardware.** Em bfloat16 o modelo ocupa cerca de 16,4 GB e cabe numa só
+placa de 24 GB. `device_map="auto"` usa a placa única quando há uma e reparte
+entre as duas quando há duas, de modo que o mesmo código serve à avaliação e
+ao Kaggle (T4 ×2, onde repartir é obrigatório porque 16,4 GB não cabem em
+16 GB).
+
+**Determinismo.** A decodificação é gulosa (`do_sample=False`), sem
+amostragem, e `run.sh` fixa `PYTHONHASHSEED`. A mesma entrada produz sempre a
+mesma saída; a extração e a resolução não envolvem o modelo em 98,4% das
+citações.
+
+### Docker
+
+```bash
+docker build -t caca-alucinacoes .
+
+# uma vez, com internet, para trazer os pesos ao volume:
+docker run --rm --gpus all -v "$PWD/modelo:/app/modelo" \
+    caca-alucinacoes python baixar_modelo.py
+
+# execução, sem rede:
+docker run --rm --gpus all --network none \
+    -v "$PWD/modelo:/app/modelo" -v "$PWD/dados:/dados" \
+    caca-alucinacoes bash run.sh /dados/acervo.db /dados/txt /dados/submission.csv
+```
+
+A construção da imagem roda a suíte de regressão: falhar ali denuncia um
+ambiente diferente do que produziu os números deste README. As versões estão
+fixas em `requirements.txt`.
+
+### Desenvolvimento
+
 Os dados da competição não estão versionados, porque a licença deles é a das
 regras do desafio e não nossa (ver `.gitignore`). Baixe `desafio1_bracis.db`,
 `txt/`, o `goldenset` e `kaggle_metric.py` da aba *Data* da competição e
 coloque na raiz do projeto.
 
 ```bash
-pip install torch transformers pandas numpy pytest
+pip install -r requirements.txt
 
 pytest tests/                    # suíte de regressão, roda em milissegundos
 python avaliar.py                # avaliação determinística, sem carregar o modelo

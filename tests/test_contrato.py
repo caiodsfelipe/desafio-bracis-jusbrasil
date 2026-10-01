@@ -106,3 +106,32 @@ def test_documento_sem_citacoes_vira_traco():
     from json_to_submission import encode
 
     assert encode(documento_em_contrato("doc", [], [])) == "-"
+
+
+@exige_conversor
+@pytest.mark.parametrize(
+    "resolucoes",
+    [
+        [_Resolucao("real", 123, 1.0), _Resolucao("incompleta")],
+        [_Resolucao("inventada", None, 1.0)],
+        [_Resolucao("real", 7, None)],  # caminho que omite a confiança
+        [],
+    ],
+)
+def test_celula_do_csv_concorda_com_o_conversor(resolucoes):
+    """A célula que o ponto de entrada escreve é a que o conversor produz a
+    partir do JSON.
+
+    As duas saídas descrevem a mesma predição, e antes eram montadas em
+    lugares diferentes: a igualdade dependia de duas cópias concordarem à
+    mão. Agora `celula_da_predicao` é a única dona do formato, e este caso
+    trava a concordância com o conversor da organização.
+    """
+    from json_to_submission import encode
+
+    from contrato import celula_da_predicao
+
+    candidatos = [_Candidato(i * 10, i * 10 + 8, "Rcl 45678/DF") for i in range(len(resolucoes))]
+    assert celula_da_predicao(candidatos, resolucoes) == encode(
+        documento_em_contrato("doc", candidatos, resolucoes)
+    )
