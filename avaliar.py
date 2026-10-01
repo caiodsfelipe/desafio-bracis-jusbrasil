@@ -91,10 +91,11 @@ def prever(con, modelo, indice, texto):
 
 
 def _iou(a, b):
-    intersecao = max(0, min(a[1], b[1]) - max(a[0], b[0]))
-    if not intersecao:
-        return 0.0
-    return intersecao / ((a[1] - a[0]) + (b[1] - b[0]) - intersecao)
+    """A mesma sobreposição que a extração usa para deduplicar, e que a
+    métrica oficial usa para casar predição e gabarito."""
+    from extracao import iou
+
+    return iou(a, b)
 
 
 def acertos_por_caminho(gabarito, predicoes):

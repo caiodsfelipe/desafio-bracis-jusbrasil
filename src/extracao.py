@@ -103,7 +103,7 @@ def _candidatos_dos_padroes(texto: str) -> list[CandidatoCitacao]:
     ]
 
 
-def _iou(a: tuple[int, int], b: tuple[int, int]) -> float:
+def iou(a: tuple[int, int], b: tuple[int, int]) -> float:
     """Interseção sobre união entre dois spans. O limiar de 0,5 usado
     adiante é o mesmo da avaliação oficial."""
     inicio_a, fim_a = a
@@ -122,7 +122,7 @@ def _conflita(a: tuple[int, int], b: tuple[int, int], iou_min: float) -> bool:
     de um span envolver o outro por inteiro, o que produz IoU baixo mas
     ainda é uma única citação.
     """
-    if _iou(a, b) >= iou_min:
+    if iou(a, b) >= iou_min:
         return True
     inicio_a, fim_a = a
     inicio_b, fim_b = b

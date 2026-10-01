@@ -65,6 +65,9 @@ class QwenClassificador:
     def _carregar(self) -> None:
         if self._model is not None:
             return
+        # torch e transformers são importados aqui, e não no topo: custam
+        # segundos de inicialização, e a maioria das execuções resolve todas as
+        # citações pela estrutura, sem nunca chegar a este ponto.
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
 

@@ -13,6 +13,11 @@ import re
 import sqlite3
 from dataclasses import dataclass
 
+from especie_recurso import autua_o_processo, familia, familia_da_ocorrencia
+from indice_normativo import eh_citacao_normativa, resolver_normativo
+from normalizacao import normalizar_identificadores
+from prompt_dono import NENHUMA, escolher_registro_lote
+
 
 @dataclass
 class Candidato:
@@ -198,8 +203,6 @@ def _resolver_pela_especie(ordenados: list[Candidato], trecho: str) -> Resolucao
     ocorrência mais adiantada, que erra o link na pior das hipóteses, em
     vez de negar a existência do processo, que é o erro grave.
     """
-    from especie_recurso import familia, familia_da_ocorrencia
-
     especie_citada = familia(trecho)
     if especie_citada is None:
         return resolvido_por(
@@ -215,8 +218,6 @@ def _resolver_pela_especie(ordenados: list[Candidato], trecho: str) -> Resolucao
     # Entre os compatíveis, o que apresenta o número como os autos que julga
     # é o processo citado; os demais o transcrevem. Sem esse sinal vence a
     # ocorrência mais adiantada.
-    from especie_recurso import autua_o_processo
-
     autuam = [c for c in compativeis if autua_o_processo(c.texto, c.ocorrencia[0])]
     escolhidos = autuam if len(autuam) == 1 else compativeis
     return resolvido_por(
@@ -262,8 +263,6 @@ def _desempatar_por_posicao(
 
     # Vários registros trazem o número no cabeçalho: quando só um o
     # apresenta como os autos que julga, é ele o processo citado.
-    from especie_recurso import autua_o_processo
-
     autuam = [c for c in no_cabecalho if autua_o_processo(c.texto, c.ocorrencia[0])]
     if len(autuam) == 1:
         return resolvido_por("especie", "real", autuam[0].id_canonico)
@@ -333,8 +332,6 @@ def _resolver_normativa(
 ) -> Resolucao:
     """Súmula ou artigo de lei, pelo índice dos registros próprios desses
     dispositivos: buscá-los no FTS devolveria os acórdãos que os mencionam."""
-    from indice_normativo import resolver_normativo
-
     id_normativo = resolver_normativo(indice_normativo, trecho)
     if id_normativo is None:
         return resolvido_por("normativo", "inventada")
@@ -369,9 +366,6 @@ def resolver_citacoes(
     O trabalho determinístico de todos os candidatos é feito primeiro, e as
     perguntas ao LLM seguem numa única chamada em lote.
     """
-    from indice_normativo import eh_citacao_normativa
-    from normalizacao import normalizar_identificadores
-
     busca = _BuscaNoAcervo(con)
     resultados: list[Resolucao | None] = [None] * len(candidatos)
     # Citações que nenhum critério estrutural separou, e que vão ao modelo
@@ -412,8 +406,6 @@ def _resolver_disputas(
     qwen, candidatos: list, em_disputa: list[tuple[int, list[Candidato]]]
 ) -> list[tuple[int, Resolucao]]:
     """Disputas de todos os documentos resolvidas numa só ida ao modelo."""
-    from prompt_dono import NENHUMA, escolher_registro_lote
-
     perguntas = [
         (candidatos[posicao].trecho, [a.texto for a in registros])
         for posicao, registros in em_disputa
