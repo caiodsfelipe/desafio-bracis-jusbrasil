@@ -132,7 +132,7 @@ def buscar_candidatos(con: sqlite3.Connection, identificador: str) -> list[Candi
 # confiança. O campo é opcional, e a média do Brier corre apenas sobre as
 # citações que o declaram: omiti-lo retira a citação do cálculo do bônus sem
 # tirá-la da classificação. Para um caminho que pode errar, calar domina
-# qualquer valor declarado — se acerta, a média das demais já está no teto; se
+# qualquer valor declarado: se acerta, a média das demais já está no teto; se
 # erra, o termo que puxaria o bônus para baixo não entra.
 #
 # Dois caminhos podem partilhar o mesmo valor quando acertam na mesma medida: é

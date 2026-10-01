@@ -7,8 +7,8 @@ localiza cada citação de jurisprudência ou de lei e a classifica como `real`
 Um modelo de linguagem que inventa um número de processo produz uma citação
 com a forma exata de uma verdadeira: a sigla do recurso, o número com
 separador de milhar, a sigla da UF, o relator. A diferença não está no texto,
-e sim em haver ou não um processo com aquele número — e um número quase
-idêntico ao de um processo real aponta um processo diferente, não o mesmo.
+e sim em haver ou não um processo com aquele número. Um número quase idêntico
+ao de um processo real aponta um processo diferente, não o mesmo.
 
 Solução para o Desafio 1 do BRACIS 2026 × Jusbrasil, onde marcou **1.100**, o
 teto da métrica oficial: macro-F1 de 1,0 nos dois níveis e nenhum erro grave.
@@ -37,9 +37,9 @@ Construído com [Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B) e SQLite FTS5.
 
 ## Executar
 
-A entrada é um SQLite com o acervo de jurisprudência — os acórdãos, as súmulas
-e os dispositivos de lei contra os quais cada citação é verificada — e uma
-pasta de documentos em `.txt`.
+A entrada é um SQLite com o acervo de jurisprudência, que reúne os acórdãos,
+as súmulas e os dispositivos de lei contra os quais cada citação é verificada,
+e uma pasta de documentos em `.txt`.
 
 ```bash
 python baixar_modelo.py                                  # pesos, uma vez

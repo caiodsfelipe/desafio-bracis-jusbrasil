@@ -240,8 +240,8 @@ def test_ano_da_citacao_nao_torna_real_um_processo_inventado():
 
 def test_numero_curto_da_data_nao_apaga_a_resposta_do_processo():
     """O dia e o mês casam com boa parte do acervo e são ambíguos por
-    definição. Como o número do processo já respondeu — o acervo não o
-    contém —, a citação é inventada, e não incompleta."""
+    definição. Como o número do processo já respondeu, e o acervo não o
+    contém, a citação é inventada em vez de incompleta."""
     con = _acervo_em_memoria(
         [(idc, f"Documento {idc} de 07 e 01 no acervo. " + "x" * 200) for idc in range(1, 30)]
     )

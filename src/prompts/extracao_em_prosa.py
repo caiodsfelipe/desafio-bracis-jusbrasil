@@ -46,7 +46,7 @@ em português.
 
 Regras obrigatórias:
 1. Copie cada citação EXATAMENTE como aparece no texto, caractere por \
-caractere — incluindo quebras de linha, abreviações e eventuais erros de \
+caractere, incluindo quebras de linha, abreviações e eventuais erros de \
 digitação. Não corrija, não complete, não normalize nada.
 1b. Copie APENAS a citação em si, não a frase inteira em que ela aparece. \
 Comece na designação do julgado (a sigla, o nome do recurso, ou "julgado do", \
@@ -60,7 +60,7 @@ antes ("Invoca-se, ainda,", "Como já se reconheceu no") nem o que vem depois \
    Certo:  "julgado do STM proferido em 2023 pela relatoria de CARLOS AUGUSTO AMARAL OLIVEIRA"
 2. Não invente citações. Se não tiver certeza de que um trecho é uma \
 citação, não o inclua.
-3. Liste SOMENTE as citações que NÃO trazem número identificador — aquelas \
+3. Liste SOMENTE as citações que NÃO trazem número identificador, aquelas \
 em que o julgado ou a norma é referido por descrição. Dois casos:
    - julgado descrito por tribunal, ano e relator: "julgado do STF proferido \
 em 2024 pela relatoria de Dias Toffoli", "precedente do STM de 2023, da \
