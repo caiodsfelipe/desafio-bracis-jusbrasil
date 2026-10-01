@@ -10,6 +10,7 @@ A decodificação é gulosa, sem amostragem, para que a mesma entrada produza
 sempre a mesma saída. O modo de raciocínio passo a passo fica desligado:
 a tarefa é de leitura direta.
 """
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -30,7 +31,16 @@ DEVICE_MAP_PADRAO = "auto"
 # repositório, e exigir modo offline, faz o carregamento falhar de imediato
 # e com mensagem clara se os pesos não tiverem sido baixados antes, em vez de
 # tentar alcançar a rede e expirar.
-CACHE_DO_MODELO = Path(__file__).resolve().parent.parent / "modelo"
+#
+# `CACHE_DO_MODELO` reaponta o cache, e `MODELO_ONLINE=1` permite a busca na
+# rede. Os dois existem para o notebook do Kaggle, onde o dataset é somente
+# leitura e os pesos vêm do Hub a cada sessão; a execução da avaliação usa os
+# padrões, que são o cache do repositório e o modo offline.
+CACHE_DO_MODELO = Path(
+    os.environ.get("CACHE_DO_MODELO")
+    or Path(__file__).resolve().parent.parent / "modelo"
+)
+SOMENTE_ARQUIVOS_LOCAIS = os.environ.get("MODELO_ONLINE") != "1"
 
 
 @dataclass
@@ -58,12 +68,12 @@ class QwenClassificador:
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
-        # O cache local e o modo offline valem para esta carga: os pesos já
-        # estão em disco, e alcançar a rede não é permitido nem necessário.
+        # Na execução da avaliação os pesos já estão em disco, e alcançar a
+        # rede não é permitido nem necessário.
         comuns = {
             "revision": MODELO_REVISAO,
             "cache_dir": str(CACHE_DO_MODELO),
-            "local_files_only": True,
+            "local_files_only": SOMENTE_ARQUIVOS_LOCAIS,
         }
         try:
             self._tokenizer = AutoTokenizer.from_pretrained(MODELO_ID, **comuns)

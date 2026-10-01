@@ -4,8 +4,14 @@ Verifica citações jurídicas em pareceres gerados por IA. Dado um documento,
 localiza cada citação de jurisprudência ou de lei e a classifica como `real`
 (com o `id_canonico` do registro no acervo), `inventada` ou `incompleta`.
 
-Solução para o Desafio 1 do BRACIS 2026 × Jusbrasil. Marca **1.100** no
-conjunto de desenvolvimento, o teto da métrica oficial.
+Um modelo de linguagem que inventa um número de processo produz uma citação
+com a forma exata de uma verdadeira: a sigla do recurso, o número com
+separador de milhar, a sigla da UF, o relator. A diferença não está no texto,
+e sim em haver ou não um processo com aquele número — e um número quase
+idêntico ao de um processo real aponta um processo diferente, não o mesmo.
+
+Solução para o Desafio 1 do BRACIS 2026 × Jusbrasil, onde marcou **1.100**, o
+teto da métrica oficial: macro-F1 de 1,0 nos dois níveis e nenhum erro grave.
 
 Cada citação percorre quatro etapas:
 
@@ -31,25 +37,24 @@ Construído com [Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B) e SQLite FTS5.
 
 ## Executar
 
-Baixe os pesos uma vez, com internet:
+A entrada é um SQLite com o acervo de jurisprudência — os acórdãos, as súmulas
+e os dispositivos de lei contra os quais cada citação é verificada — e uma
+pasta de documentos em `.txt`.
 
 ```bash
-python baixar_modelo.py          # Qwen3-8B em revisão fixa, para ./modelo (16 GB)
-```
-
-Depois a execução é offline:
-
-```bash
+python baixar_modelo.py                                  # pesos, uma vez
 bash run.sh <caminho_db> <pasta_txt> <arquivo_saida>
 ```
 
-Grava o CSV no formato das submissões e, ao lado dele, os JSONs do contrato.
-Os três caminhos chegam por argumento.
+Grava um CSV com o span, a classe, o `id_canonico` e a confiança de cada
+citação, e os JSONs equivalentes ao lado dele.
 
-Em bfloat16 o modelo ocupa cerca de 16,4 GB e cabe numa placa de 24 GB.
+Em bfloat16 o modelo ocupa cerca de 16,4 GB e cabe numa placa de 24 GB;
 `device_map="auto"` usa a placa única quando há uma e reparte quando há mais.
-A decodificação é gulosa e `run.sh` fixa `PYTHONHASHSEED`, de modo que a mesma
-entrada produz sempre a mesma saída.
+A decodificação é gulosa e `run.sh` fixa `PYTHONHASHSEED`: a mesma entrada
+produz sempre a mesma saída. Depois do download inicial nada depende da rede,
+e `MODELO_ONLINE=1` com `CACHE_DO_MODELO` reaponta os pesos para ambientes de
+sistema de arquivos somente leitura, como o notebook do Kaggle.
 
 ## Docker
 
@@ -71,29 +76,36 @@ A construção da imagem roda a suíte de testes. As versões estão fixas em
 
 ## Desenvolvimento
 
-Os dados da competição não são redistribuídos aqui. Baixe
-`desafio1_bracis.db`, `txt/`, o `goldenset` e `kaggle_metric.py` da aba *Data*
-da competição e coloque na raiz do projeto.
-
 ```bash
 pip install -r requirements.txt
-
-pytest tests/                    # testes offline: sem banco, sem modelo
+pytest tests/                    # 281 testes, em milissegundos
 ruff check src tests
+```
+
+A suíte roda sem banco, sem modelo e sem rede: os padrões de extração, a
+normalização e as regras de classificação são exercitados sobre casos
+literais, e é o que torna o ciclo de desenvolvimento rápido. Os testes que
+precisam dos dados da competição pulam quando eles não estão presentes.
+
+Os dados pertencem à organização do desafio e não são redistribuídos aqui.
+Com eles na raiz do projeto (`desafio1_bracis.db`, `txt/`, o `goldenset` e
+`kaggle_metric.py`), a avaliação reproduz o score:
+
+```bash
 python avaliar.py                # score contra o conjunto de referência
 python avaliar.py --com-modelo   # pipeline completo, requer GPU
 ```
 
 `avaliar.py` imprime o score por nível, a cobertura da extração e o acerto por
 caminho de resolução, marcando com `*` os que dependem do modelo.
-`--json relatorio.json` grava o relatório completo.
 
 CI (`.github/workflows/testes.yml`) roda os testes e o linter em cada push.
 
 ## Generalização
 
-O conjunto final são documentos que ninguém viu. Estas ferramentas medem o
-comportamento fora da amostra distribuída:
+Um score alto em vinte e seis documentos não distingue a regra que capturou o
+critério da que se ajustou à amostra. Estas ferramentas medem o comportamento
+fora dela:
 
 ```bash
 python robustez.py               # score sob perturbação dos documentos
@@ -138,9 +150,8 @@ notebook_kaggle.py, empacotar.py   artefatos do Kaggle
 tests/                    testes offline
 ```
 
-O artefato oficial é um JSON por documento, de onde o `submission.csv` sai
-pelo conversor da organização; um teste trava que o CSV escrito direto é byte
-a byte o que o conversor produziria.
+A saída canônica é um JSON por documento, e o CSV deriva dele; um teste trava
+que as duas formas descrevem a mesma predição, byte a byte.
 
 ## Licença
 

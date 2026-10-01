@@ -20,6 +20,13 @@ BASE = "/kaggle/input/datasets/caiodsfelipe/desafio-bracis-projeto"
 sys.path.insert(0, os.path.join(BASE, "src"))
 sys.path.insert(0, BASE)
 
+# O dataset anexado é somente leitura, e no Kaggle os pesos vêm do Hub a cada
+# sessão. A execução da avaliação usa os padrões do módulo: cache dentro do
+# repositório e modo offline, com os pesos trazidos antes por
+# `baixar_modelo.py`.
+os.environ.setdefault("CACHE_DO_MODELO", "/kaggle/working/modelo")
+os.environ.setdefault("MODELO_ONLINE", "1")
+
 import revisao
 from contrato import gravar
 from extracao import extrair_todos
